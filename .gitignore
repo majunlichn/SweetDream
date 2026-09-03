@@ -65,6 +65,11 @@ compile_commands.json
 # vcpkg
 vcpkg_installed/
 
+# Locally built SDL3
+ThirdParty/SDL/source/
+ThirdParty/SDL/build/
+ThirdParty/SDL/installed/
+
 # debug information files
 *.dwo
 

@@ -14,6 +14,10 @@ project(SweetDream VERSION 0.0.0 LANGUAGES CXX)
 
 set(SD_PROJECT_ROOT "${CMAKE_CURRENT_SOURCE_DIR}")
 
+option(SD_BUILD_SAMPLES "Build SweetDream samples" ON)
+option(SD_BUILD_GUI "Build SweetDream GUI support using SDL3" ON)
+include(cmake/sdFindSDL3.cmake)
+
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
@@ -102,6 +106,44 @@ target_link_libraries(SweetDream
     PUBLIC rad::rad
 )
 
+if(SD_BUILD_GUI)
+    sd_find_sdl3()
+
+    # Keep GUI enabled by default without making SDL3 mandatory for core-only
+    # configurations.
+    set(SD_GUI_DEPENDENCIES_FOUND ON)
+    if(NOT TARGET SDL3::SDL3)
+        set(SD_GUI_DEPENDENCIES_FOUND OFF)
+    endif()
+
+    if(NOT SD_GUI_DEPENDENCIES_FOUND)
+        message(WARNING
+            "SD_BUILD_GUI is enabled, but SDL3 was not found; "
+            "GUI support will be disabled for this configuration."
+        )
+        set(SD_BUILD_GUI OFF)
+    endif()
+endif()
+
+if(SD_BUILD_GUI)
+    set(SWEETDREAM_PLATFORM_SOURCES
+        Source/SweetDream/Platform/EventHandler.h
+        Source/SweetDream/Platform/EventHandler.cpp
+        Source/SweetDream/Platform/Application.h
+        Source/SweetDream/Platform/Application.cpp
+    )
+    target_sources(SweetDream PRIVATE ${SWEETDREAM_PLATFORM_SOURCES})
+    source_group(
+        TREE "${CMAKE_CURRENT_SOURCE_DIR}/Source/SweetDream"
+        FILES ${SWEETDREAM_PLATFORM_SOURCES}
+    )
+
+    target_link_libraries(SweetDream
+        PUBLIC SDL3::SDL3
+    )
+    target_compile_definitions(SweetDream PUBLIC SD_BUILD_GUI=1)
+endif()
+
 if(WIN32)
     target_compile_definitions(SweetDream
         PUBLIC NOMINMAX=1
@@ -115,8 +157,6 @@ if(WIN32)
     )
 endif()
 
-option(SD_BUILD_SAMPLES "Build SweetDream samples" ON)
-
 if(SD_BUILD_SAMPLES)
     add_executable(HelloTriangle
         Samples/HelloTriangle/HelloTriangle.cpp
@@ -128,6 +168,14 @@ if(SD_BUILD_SAMPLES)
         FOLDER Samples
         VS_DEBUGGER_WORKING_DIRECTORY "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}"
     )
+    if(WIN32 AND SD_BUILD_GUI)
+        add_custom_command(TARGET HelloTriangle POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                "$<TARGET_FILE:SDL3::SDL3>"
+                "$<TARGET_FILE_DIR:HelloTriangle>"
+            COMMENT "Copying SDL3 shared runtime"
+        )
+    endif()
 endif()
 
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
