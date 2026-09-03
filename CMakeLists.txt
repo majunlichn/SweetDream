@@ -117,9 +117,13 @@ if(SD_BUILD_GUI)
         ThirdParty/imgui/backends/imgui_impl_sdl3.cpp
         ThirdParty/imgui/backends/imgui_impl_vulkan.cpp
     )
+    set(IMPLOT_SOURCES
+        ThirdParty/implot/implot.cpp
+        ThirdParty/implot/implot_items.cpp
+    )
 
-    # Keep GUI enabled by default without making SDL3 or Dear ImGui mandatory
-    # for core-only configurations.
+    # Keep GUI enabled by default without making SDL3 or the GUI submodules
+    # mandatory for core-only configurations.
     set(SD_GUI_DEPENDENCIES_FOUND ON)
     if(NOT TARGET SDL3::SDL3)
         set(SD_GUI_DEPENDENCIES_FOUND OFF)
@@ -129,10 +133,15 @@ if(SD_BUILD_GUI)
             set(SD_GUI_DEPENDENCIES_FOUND OFF)
         endif()
     endforeach()
+    foreach(IMPLOT_SOURCE IN LISTS IMPLOT_SOURCES)
+        if(NOT EXISTS "${SD_PROJECT_ROOT}/${IMPLOT_SOURCE}")
+            set(SD_GUI_DEPENDENCIES_FOUND OFF)
+        endif()
+    endforeach()
 
     if(NOT SD_GUI_DEPENDENCIES_FOUND)
         message(WARNING
-            "SD_BUILD_GUI is enabled, but SDL3 or Dear ImGui was not found; "
+            "SD_BUILD_GUI is enabled, but SDL3, Dear ImGui, or ImPlot was not found; "
             "GUI support will be disabled for this configuration."
         )
         set(SD_BUILD_GUI OFF)
@@ -161,6 +170,18 @@ if(SD_BUILD_GUI)
     )
     set_target_properties(imgui PROPERTIES FOLDER ThirdParty)
 
+    source_group(
+        TREE "${SD_PROJECT_ROOT}/ThirdParty/implot"
+        FILES ${IMPLOT_SOURCES}
+    )
+    add_library(implot STATIC EXCLUDE_FROM_ALL ${IMPLOT_SOURCES})
+    add_library(implot::implot ALIAS implot)
+    target_include_directories(implot SYSTEM
+        PUBLIC "${SD_PROJECT_ROOT}/ThirdParty/implot"
+    )
+    target_link_libraries(implot PUBLIC imgui::imgui)
+    set_target_properties(implot PROPERTIES FOLDER ThirdParty)
+
     set(SWEETDREAM_PLATFORM_SOURCES
         Source/SweetDream/Platform/EventHandler.h
         Source/SweetDream/Platform/EventHandler.cpp
@@ -186,6 +207,7 @@ if(SD_BUILD_GUI)
     target_link_libraries(SweetDream
         PUBLIC SDL3::SDL3
         PUBLIC imgui::imgui
+        PUBLIC implot::implot
     )
     target_compile_definitions(SweetDream PUBLIC SD_BUILD_GUI=1)
 endif()
