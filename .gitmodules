@@ -1,0 +1,3 @@
+[submodule "ThirdParty/radcpp"]
+	path = ThirdParty/radcpp
+	url = https://github.com/majunlichn/radcpp.git
