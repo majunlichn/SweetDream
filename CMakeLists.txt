@@ -13,6 +13,7 @@ message(STATUS "CMAKE_TOOLCHAIN_FILE=${CMAKE_TOOLCHAIN_FILE}")
 project(SweetDream VERSION 0.0.0 LANGUAGES CXX)
 
 set(SD_PROJECT_ROOT "${CMAKE_CURRENT_SOURCE_DIR}")
+file(TO_CMAKE_PATH "$ENV{VULKAN_SDK}" SD_VULKAN_SDK_ROOT)
 
 option(SD_BUILD_SAMPLES "Build SweetDream samples" ON)
 option(SD_BUILD_GUI "Build SweetDream GUI support using SDL3" ON)
@@ -77,6 +78,10 @@ set(SWEETDREAM_SOURCES
     Source/SweetDream/Core/API/Vulkan/VulkanPipeline.cpp
     Source/SweetDream/Core/API/Vulkan/VulkanDescriptor.h
     Source/SweetDream/Core/API/Vulkan/VulkanDescriptor.cpp
+    Source/SweetDream/Shader/GLSLCompiler.h
+    Source/SweetDream/Shader/GLSLCompiler.cpp
+    Source/SweetDream/Shader/SpvContext.h
+    Source/SweetDream/Shader/SpvContext.cpp
 )
 
 set(RAD_BUILD_TESTS OFF CACHE BOOL "Build radcpp tests" FORCE)
@@ -92,7 +97,59 @@ source_group(
     FILES ${SWEETDREAM_SOURCES}
 )
 
-find_package(Vulkan REQUIRED)
+find_package(Vulkan REQUIRED COMPONENTS glslc)
+find_library(SHADERC_SHARED_LIBRARY
+    NAMES shaderc_shared
+    HINTS "${SD_VULKAN_SDK_ROOT}/Lib" "${SD_VULKAN_SDK_ROOT}/lib"
+    REQUIRED
+)
+add_library(shaderc::shaderc SHARED IMPORTED)
+
+if(WIN32)
+    find_file(SHADERC_SHARED_RUNTIME
+        NAMES shaderc_shared.dll
+        HINTS "${SD_VULKAN_SDK_ROOT}/Bin" "${SD_VULKAN_SDK_ROOT}/bin"
+        REQUIRED
+    )
+    set_target_properties(shaderc::shaderc PROPERTIES
+        IMPORTED_IMPLIB "${SHADERC_SHARED_LIBRARY}"
+        IMPORTED_LOCATION "${SHADERC_SHARED_RUNTIME}"
+    )
+else()
+    set_target_properties(shaderc::shaderc PROPERTIES
+        IMPORTED_LOCATION "${SHADERC_SHARED_LIBRARY}"
+    )
+endif()
+find_path(SPIRV_TOOLS_INCLUDE_DIR
+    NAMES spirv-tools/libspirv.h
+    HINTS "${SD_VULKAN_SDK_ROOT}/Include" "${SD_VULKAN_SDK_ROOT}/include"
+    REQUIRED
+)
+find_library(SPIRV_TOOLS_SHARED_LIBRARY
+    NAMES SPIRV-Tools-shared
+    HINTS "${SD_VULKAN_SDK_ROOT}/Lib" "${SD_VULKAN_SDK_ROOT}/lib"
+    REQUIRED
+)
+add_library(spirv-tools::spirv-tools SHARED IMPORTED)
+set_target_properties(spirv-tools::spirv-tools PROPERTIES
+    INTERFACE_COMPILE_DEFINITIONS SPIRV_TOOLS_SHAREDLIB
+    INTERFACE_INCLUDE_DIRECTORIES "${SPIRV_TOOLS_INCLUDE_DIR}"
+)
+if(WIN32)
+    find_file(SPIRV_TOOLS_SHARED_RUNTIME
+        NAMES SPIRV-Tools-shared.dll
+        HINTS "${SD_VULKAN_SDK_ROOT}/Bin" "${SD_VULKAN_SDK_ROOT}/bin"
+        REQUIRED
+    )
+    set_target_properties(spirv-tools::spirv-tools PROPERTIES
+        IMPORTED_IMPLIB "${SPIRV_TOOLS_SHARED_LIBRARY}"
+        IMPORTED_LOCATION "${SPIRV_TOOLS_SHARED_RUNTIME}"
+    )
+else()
+    set_target_properties(spirv-tools::spirv-tools PROPERTIES
+        IMPORTED_LOCATION "${SPIRV_TOOLS_SHARED_LIBRARY}"
+    )
+endif()
 find_package(VulkanMemoryAllocator CONFIG REQUIRED)
 
 target_include_directories(SweetDream
@@ -104,6 +161,8 @@ target_link_libraries(SweetDream
     PUBLIC Vulkan::Vulkan
     PUBLIC GPUOpen::VulkanMemoryAllocator
     PUBLIC rad::rad
+    PUBLIC shaderc::shaderc
+    PUBLIC spirv-tools::spirv-tools
 )
 
 if(SD_BUILD_GUI)
@@ -236,13 +295,24 @@ if(SD_BUILD_SAMPLES)
         FOLDER Samples
         VS_DEBUGGER_WORKING_DIRECTORY "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}"
     )
-    if(WIN32 AND SD_BUILD_GUI)
+    if(WIN32)
         add_custom_command(TARGET HelloTriangle POST_BUILD
             COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                "$<TARGET_FILE:SDL3::SDL3>"
+                "$<TARGET_FILE:shaderc::shaderc>"
                 "$<TARGET_FILE_DIR:HelloTriangle>"
-            COMMENT "Copying SDL3 shared runtime"
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                "$<TARGET_FILE:spirv-tools::spirv-tools>"
+                "$<TARGET_FILE_DIR:HelloTriangle>"
+            COMMENT "Copying shader tool shared runtimes"
         )
+        if(SD_BUILD_GUI)
+            add_custom_command(TARGET HelloTriangle POST_BUILD
+                COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                    "$<TARGET_FILE:SDL3::SDL3>"
+                    "$<TARGET_FILE_DIR:HelloTriangle>"
+                COMMENT "Copying SDL3 shared runtime"
+            )
+        endif()
     endif()
 endif()
 
