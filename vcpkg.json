@@ -1,0 +1,27 @@
+{
+  "dependencies": [
+    "backward-cpp",
+    "boost-algorithm",
+    "boost-container",
+    "boost-crc",
+    "boost-exception",
+    "boost-filesystem",
+    "boost-hash2",
+    "boost-json",
+    "boost-locale",
+    "boost-nowide",
+    "boost-outcome",
+    "boost-process",
+    "boost-smart-ptr",
+    "boost-stacktrace",
+    "cpu-features",
+    "eigen3",
+    "gtest",
+    "imath",
+    "pystring",
+    "spdlog",
+    "stb",
+    "vulkan-memory-allocator",
+    "xxhash"
+  ]
+}
