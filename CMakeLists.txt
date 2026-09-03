@@ -132,10 +132,19 @@ if(SD_BUILD_GUI)
         Source/SweetDream/Platform/Application.h
         Source/SweetDream/Platform/Application.cpp
     )
-    target_sources(SweetDream PRIVATE ${SWEETDREAM_PLATFORM_SOURCES})
+    set(SWEETDREAM_GUI_SOURCES
+        Source/SweetDream/Gui/Window.h
+        Source/SweetDream/Gui/Window.cpp
+    )
+    target_sources(SweetDream PRIVATE
+        ${SWEETDREAM_PLATFORM_SOURCES}
+        ${SWEETDREAM_GUI_SOURCES}
+    )
     source_group(
         TREE "${CMAKE_CURRENT_SOURCE_DIR}/Source/SweetDream"
-        FILES ${SWEETDREAM_PLATFORM_SOURCES}
+        FILES
+            ${SWEETDREAM_PLATFORM_SOURCES}
+            ${SWEETDREAM_GUI_SOURCES}
     )
 
     target_link_libraries(SweetDream
