@@ -109,16 +109,30 @@ target_link_libraries(SweetDream
 if(SD_BUILD_GUI)
     sd_find_sdl3()
 
-    # Keep GUI enabled by default without making SDL3 mandatory for core-only
-    # configurations.
+    set(IMGUI_SOURCES
+        ThirdParty/imgui/imgui.cpp
+        ThirdParty/imgui/imgui_draw.cpp
+        ThirdParty/imgui/imgui_tables.cpp
+        ThirdParty/imgui/imgui_widgets.cpp
+        ThirdParty/imgui/backends/imgui_impl_sdl3.cpp
+        ThirdParty/imgui/backends/imgui_impl_vulkan.cpp
+    )
+
+    # Keep GUI enabled by default without making SDL3 or Dear ImGui mandatory
+    # for core-only configurations.
     set(SD_GUI_DEPENDENCIES_FOUND ON)
     if(NOT TARGET SDL3::SDL3)
         set(SD_GUI_DEPENDENCIES_FOUND OFF)
     endif()
+    foreach(IMGUI_SOURCE IN LISTS IMGUI_SOURCES)
+        if(NOT EXISTS "${SD_PROJECT_ROOT}/${IMGUI_SOURCE}")
+            set(SD_GUI_DEPENDENCIES_FOUND OFF)
+        endif()
+    endforeach()
 
     if(NOT SD_GUI_DEPENDENCIES_FOUND)
         message(WARNING
-            "SD_BUILD_GUI is enabled, but SDL3 was not found; "
+            "SD_BUILD_GUI is enabled, but SDL3 or Dear ImGui was not found; "
             "GUI support will be disabled for this configuration."
         )
         set(SD_BUILD_GUI OFF)
@@ -126,6 +140,27 @@ if(SD_BUILD_GUI)
 endif()
 
 if(SD_BUILD_GUI)
+    source_group(
+        TREE "${SD_PROJECT_ROOT}/ThirdParty/imgui"
+        FILES ${IMGUI_SOURCES}
+    )
+    add_library(imgui STATIC EXCLUDE_FROM_ALL ${IMGUI_SOURCES})
+    add_library(imgui::imgui ALIAS imgui)
+    target_include_directories(imgui SYSTEM
+        PUBLIC
+            "${SD_PROJECT_ROOT}/Source"
+            "${SD_PROJECT_ROOT}/ThirdParty/imgui"
+            "${SD_PROJECT_ROOT}/ThirdParty/imgui/backends"
+    )
+    target_compile_definitions(imgui PUBLIC
+        IMGUI_USER_CONFIG=\"SweetDream/Gui/ImGuiConfig.h\"
+    )
+    target_link_libraries(imgui
+        PUBLIC Vulkan::Vulkan
+        PUBLIC SDL3::SDL3
+    )
+    set_target_properties(imgui PROPERTIES FOLDER ThirdParty)
+
     set(SWEETDREAM_PLATFORM_SOURCES
         Source/SweetDream/Platform/EventHandler.h
         Source/SweetDream/Platform/EventHandler.cpp
@@ -133,6 +168,7 @@ if(SD_BUILD_GUI)
         Source/SweetDream/Platform/Application.cpp
     )
     set(SWEETDREAM_GUI_SOURCES
+        Source/SweetDream/Gui/ImGuiConfig.h
         Source/SweetDream/Gui/Window.h
         Source/SweetDream/Gui/Window.cpp
     )
@@ -149,6 +185,7 @@ if(SD_BUILD_GUI)
 
     target_link_libraries(SweetDream
         PUBLIC SDL3::SDL3
+        PUBLIC imgui::imgui
     )
     target_compile_definitions(SweetDream PUBLIC SD_BUILD_GUI=1)
 endif()
