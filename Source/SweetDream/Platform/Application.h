@@ -32,6 +32,12 @@ public:
 
     // Owns initialization, the event loop, and orderly shutdown.
     [[nodiscard]] int Run(int argc, char** argv);
+    // Callback-driven alternative to Run().
+    [[nodiscard]] bool Init(int argc, char** argv);
+    void DispatchEvent(const SDL_Event& event);
+    void DispatchFrame();
+    // If still Running, call RequestExit first so teardown actually runs.
+    void Shutdown();
     void RequestExit(int exitCode = 0) noexcept;
 
     bool RegisterEventHandler(rad::Ref<EventHandler> handler);
@@ -53,11 +59,6 @@ protected:
     virtual void OnShutdown() {}
     virtual bool OnEvent(const SDL_Event& event) { return false; }
     virtual void OnFrame() {}
-
-    [[nodiscard]] bool Init(int argc, char** argv);
-    void Shutdown();
-    void DispatchEvent(const SDL_Event& event);
-    void DispatchFrame();
 
 private:
     std::atomic<Status> m_status = Status::Uninitialized;

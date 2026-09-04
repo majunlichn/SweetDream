@@ -251,6 +251,8 @@ if(SD_BUILD_GUI)
         Source/SweetDream/Gui/ImGuiConfig.h
         Source/SweetDream/Gui/Window.h
         Source/SweetDream/Gui/Window.cpp
+        Source/SweetDream/Gui/VulkanWindow.h
+        Source/SweetDream/Gui/VulkanWindow.cpp
     )
     target_sources(SweetDream PRIVATE
         ${SWEETDREAM_PLATFORM_SOURCES}
@@ -284,9 +286,11 @@ if(WIN32)
     )
 endif()
 
-if(SD_BUILD_SAMPLES)
+if(SD_BUILD_SAMPLES AND SD_BUILD_GUI)
     add_executable(HelloTriangle
         Samples/HelloTriangle/HelloTriangle.cpp
+        Samples/HelloTriangle/MainWindow.h
+        Samples/HelloTriangle/MainWindow.cpp
     )
     target_link_libraries(HelloTriangle
         PRIVATE SweetDream::SweetDream
@@ -303,16 +307,11 @@ if(SD_BUILD_SAMPLES)
             COMMAND ${CMAKE_COMMAND} -E copy_if_different
                 "$<TARGET_FILE:spirv-tools::spirv-tools>"
                 "$<TARGET_FILE_DIR:HelloTriangle>"
-            COMMENT "Copying shader tool shared runtimes"
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                "$<TARGET_FILE:SDL3::SDL3>"
+                "$<TARGET_FILE_DIR:HelloTriangle>"
+            COMMENT "Copying HelloTriangle shared runtimes"
         )
-        if(SD_BUILD_GUI)
-            add_custom_command(TARGET HelloTriangle POST_BUILD
-                COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                    "$<TARGET_FILE:SDL3::SDL3>"
-                    "$<TARGET_FILE_DIR:HelloTriangle>"
-                COMMENT "Copying SDL3 shared runtime"
-            )
-        endif()
     endif()
 endif()
 

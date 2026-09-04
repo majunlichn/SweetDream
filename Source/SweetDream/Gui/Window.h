@@ -22,10 +22,12 @@ public:
     Window(const Window&) = delete;
     Window& operator=(const Window&) = delete;
 
-    [[nodiscard]] bool Create(const char* title, int width, int height, SDL_WindowFlags flags = 0);
+    [[nodiscard]] virtual bool Create(const char* title, int width, int height,
+                                      SDL_WindowFlags flags = 0);
     // Destroy API presentation resources (such as Vulkan swapchains and surfaces)
-    // before destroying their native window.
-    void Destroy();
+    // before destroying their native window. Derived windows that own GPU
+    // resources must override this and release them first.
+    virtual void Destroy();
 
     [[nodiscard]] bool IsCreated() const noexcept { return m_handle != nullptr; }
     [[nodiscard]] bool IsCloseRequested() const noexcept { return m_closeRequested; }
