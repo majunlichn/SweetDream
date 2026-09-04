@@ -253,6 +253,8 @@ if(SD_BUILD_GUI)
         Source/SweetDream/Gui/Window.cpp
         Source/SweetDream/Gui/VulkanWindow.h
         Source/SweetDream/Gui/VulkanWindow.cpp
+        Source/SweetDream/Gui/GuiContext.h
+        Source/SweetDream/Gui/GuiContext.cpp
     )
     target_sources(SweetDream PRIVATE
         ${SWEETDREAM_PLATFORM_SOURCES}
@@ -291,6 +293,8 @@ if(SD_BUILD_SAMPLES AND SD_BUILD_GUI)
         Samples/HelloTriangle/HelloTriangle.cpp
         Samples/HelloTriangle/MainWindow.h
         Samples/HelloTriangle/MainWindow.cpp
+        ThirdParty/imgui/imgui_demo.cpp
+        ThirdParty/implot/implot_demo.cpp
     )
     target_link_libraries(HelloTriangle
         PRIVATE SweetDream::SweetDream

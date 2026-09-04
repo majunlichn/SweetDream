@@ -11,6 +11,7 @@
 #include <SweetDream/Core/API/Vulkan/VulkanSwapchain.h>
 #include <SweetDream/Core/API/Vulkan/VulkanUploader.h>
 #include <SweetDream/Core/IO/Logging.h>
+#include <SweetDream/Gui/GuiContext.h>
 #include <SweetDream/Platform/Application.h>
 #include <SweetDream/Shader/GLSLCompiler.h>
 #if !defined(NDEBUG)
@@ -22,7 +23,11 @@
 
 #include <Eigen/Geometry>
 
+#include <imgui.h>
+#include <implot.h>
+
 #define SDL_MAIN_USE_CALLBACKS
+#include <SDL3/SDL_keycode.h>
 #include <SDL3/SDL_main.h>
 
 #include <array>
@@ -53,6 +58,9 @@ struct alignas(16) TriangleUniform
     rad::Matrix4f transform;
 };
 
+// Equilateral triangle centered at the origin; vertices lie on this circle.
+constexpr float TriangleCircumradius = 0.75f;
+
 [[nodiscard]] rad::Matrix4f Project(const rad::Matrix4f& matrix, float aspect)
 {
     rad::Matrix4f projection = rad::Matrix4f::Identity();
@@ -68,6 +76,27 @@ struct alignas(16) TriangleUniform
 {
     return matrix * Eigen::Isometry3f(Eigen::AngleAxisf(angleRadians, axis.normalized()))
                         .matrix();
+}
+
+void DrawTriangleCircumcircle()
+{
+    const ImGuiViewport* viewport = ImGui::GetMainViewport();
+    const ImVec2 size = viewport->Size;
+    if ((size.x <= 0.0f) || (size.y <= 0.0f))
+    {
+        return;
+    }
+
+    const float radius =
+        TriangleCircumradius * 0.5f * ((size.x < size.y) ? size.x : size.y);
+    // num_segments == 0 uses a 48-sample LUT. Tessellate from radius (already min viewport side).
+    int numSegments = static_cast<int>(radius);
+    if (numSegments < 48)
+    {
+        numSegments = 48;
+    }
+    ImGui::GetBackgroundDrawList()->AddCircle(viewport->GetCenter(), radius, IM_COL32_WHITE,
+                                               numSegments, 2.0f);
 }
 
 constexpr const char* TriangleVertexShader = R"glsl(
@@ -180,9 +209,47 @@ protected:
 
         CreateRenderingResources();
         CreateCommandBuffers();
+        if (!m_gui.Init(m_window.get()))
+        {
+            throw std::runtime_error("Failed to initialize GuiContext");
+        }
+        SD_LOG(info, "Press F1 to show/hide the ImGui demo window");
+        SD_LOG(info, "Press F2 to show/hide the ImPlot demo window");
         // Wake the event loop so the triangle keeps rotating without input.
         SetEventWaitTimeout(1);
         return true;
+    }
+
+    bool OnEvent(const SDL_Event& event) override
+    {
+        m_gui.ProcessEvent(event);
+
+        const ImGuiIO& io = m_gui.GetIO();
+        if ((event.type == SDL_EVENT_KEY_DOWN) && !event.key.repeat)
+        {
+            if (event.key.key == SDLK_F1)
+            {
+                m_showDemoWindow = !m_showDemoWindow;
+            }
+            if (event.key.key == SDLK_F2)
+            {
+                m_showPlotDemoWindow = !m_showPlotDemoWindow;
+            }
+        }
+
+        if (io.WantCaptureMouse &&
+            ((event.type == SDL_EVENT_MOUSE_MOTION) || (event.type == SDL_EVENT_MOUSE_BUTTON_DOWN) ||
+             (event.type == SDL_EVENT_MOUSE_BUTTON_UP) || (event.type == SDL_EVENT_MOUSE_WHEEL)))
+        {
+            return true;
+        }
+        if (io.WantCaptureKeyboard &&
+            ((event.type == SDL_EVENT_KEY_DOWN) || (event.type == SDL_EVENT_KEY_UP) ||
+             (event.type == SDL_EVENT_TEXT_INPUT) || (event.type == SDL_EVENT_TEXT_EDITING)))
+        {
+            return true;
+        }
+        return false;
     }
 
     void OnFrame() override
@@ -227,6 +294,17 @@ protected:
         const vk::ImageSubresourceRange colorRange{vk::ImageAspectFlagBits::eColor, 0, 1, 0,
                                                    1};
 
+        m_gui.NewFrame();
+        DrawTriangleCircumcircle();
+        if (m_showDemoWindow)
+        {
+            ImGui::ShowDemoWindow(&m_showDemoWindow);
+        }
+        if (m_showPlotDemoWindow)
+        {
+            ImPlot::ShowDemoWindow(&m_showPlotDemoWindow);
+        }
+
         commandBuffer->Reset();
         commandBuffer->Begin(vk::CommandBufferUsageFlagBits::eOneTimeSubmit);
 
@@ -262,6 +340,7 @@ protected:
         commandBuffer->SetScissorWithCount(renderArea);
         commandBuffer->DrawIndexed(m_indexCount, 1, 0, 0, 0);
 
+        m_gui.Render(commandBuffer);
         commandBuffer->EndRendering();
 
         commandBuffer->ImageMemoryBarrier(
@@ -291,6 +370,7 @@ protected:
         if (m_window)
         {
             m_window->WaitIdle();
+            m_gui.Shutdown();
             DestroyRenderingResources();
             m_window->Destroy();
             m_window.reset();
@@ -305,11 +385,13 @@ private:
             return false;
         }
 
+        m_gui.OnSwapchainRecreated();
         const vk::Format format = m_window->GetSwapchain()->GetImageFormat();
         if (m_pipelineColorFormat != format)
         {
             CreateTrianglePipeline();
         }
+        m_gui.OnRenderTargetChanged(format);
         return true;
     }
 
@@ -358,7 +440,7 @@ private:
         m_fragmentShader = device->CreateShaderModule(fragmentSpirv.assume_value());
 
         // Equilateral triangle centered at the origin; vertices lie on this circle.
-        constexpr float circumradius = 0.75f;
+        constexpr float circumradius = TriangleCircumradius;
         constexpr float halfHeight = circumradius * 0.5f;
         constexpr float halfWidth = circumradius * std::numbers::sqrt3_v<float> * 0.5f;
         const std::array<TriangleVertex, 3> vertices = {{
@@ -502,6 +584,9 @@ private:
     rad::Ref<sd::VulkanCommandPool> m_commandPool;
     std::vector<rad::Ref<sd::VulkanCommandBuffer>> m_commandBuffers;
     std::chrono::steady_clock::time_point m_startTime;
+    sd::GuiContext m_gui;
+    bool m_showDemoWindow = false;
+    bool m_showPlotDemoWindow = false;
 }; // class HelloTriangle
 
 #if defined(SDL_MAIN_USE_CALLBACKS)

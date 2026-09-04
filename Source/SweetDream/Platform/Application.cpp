@@ -242,6 +242,11 @@ bool Application::IsInitialized() const noexcept
 
 void Application::DispatchEvent(const SDL_Event& event)
 {
+    if (OnEvent(event))
+    {
+        return;
+    }
+
     if (event.type == SDL_EVENT_QUIT)
     {
         RequestExit();
@@ -255,8 +260,6 @@ void Application::DispatchEvent(const SDL_Event& event)
             return;
         }
     }
-
-    static_cast<void>(OnEvent(event));
 }
 
 void Application::DispatchFrame()

@@ -57,6 +57,8 @@ public:
 protected:
     virtual bool OnInitialize() { return true; }
     virtual void OnShutdown() {}
+    // Called before event handlers. Return true to stop dispatch, including the
+    // default SDL_EVENT_QUIT -> RequestExit() handling.
     virtual bool OnEvent(const SDL_Event& event) { return false; }
     virtual void OnFrame() {}
 
