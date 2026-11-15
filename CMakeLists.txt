@@ -289,6 +289,8 @@ if(WIN32)
 endif()
 
 if(SD_BUILD_SAMPLES AND SD_BUILD_GUI)
+    add_subdirectory(Samples/ShaderToy)
+
     add_executable(HelloTriangle
         Samples/HelloTriangle/HelloTriangle.cpp
         Samples/HelloTriangle/MainWindow.h

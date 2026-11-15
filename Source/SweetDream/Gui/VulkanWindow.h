@@ -70,9 +70,11 @@ public:
     [[nodiscard]] bool SetDevice(rad::Ref<VulkanDevice> device);
     [[nodiscard]] VulkanDevice* GetDevice() const noexcept { return m_device.get(); }
 
-    // Creates or recreates the swapchain. Surface loss is recovered here.
-    [[nodiscard]] bool CreateSwapchain();
-    [[nodiscard]] bool CreateSwapchain(const SwapchainConfig& config);
+    // Creates/recreates without acquiring an image. Success means ready; NotReady
+    // means minimized/zero extent. SurfaceLost/OutOfDate may be retried.
+    // Native Vulkan errors are preserved; SDL/precondition failures return InitializationFailed.
+    [[nodiscard]] vk::Result CreateSwapchain();
+    [[nodiscard]] vk::Result CreateSwapchain(const SwapchainConfig& config);
     void DestroySwapchain();
     [[nodiscard]] VulkanSwapchain* GetSwapchain() const noexcept
     {
@@ -121,11 +123,11 @@ private:
         rad::Ref<VulkanSemaphore> swapchainImageAcquired;
     };
 
-    [[nodiscard]] bool RecreateLostSurface();
+    [[nodiscard]] bool HandleSurfaceLost();
     [[nodiscard]] bool HasDeviceSurfaceSupport(VulkanDevice* device,
                                                VulkanSurface* surface) const;
-    [[nodiscard]] bool CreateFrameResources();
-    [[nodiscard]] bool CreateRenderCompleteSemaphores();
+    [[nodiscard]] vk::Result CreateFrameResources();
+    [[nodiscard]] vk::Result CreateRenderCompleteSemaphores();
     void DestroyFrameResources();
 
     rad::Ref<VulkanInstance> m_instance;

@@ -1,0 +1,9 @@
+{
+  "passes": [
+    {
+      "name": "Image",
+      "shader": "LightCycle.glsl",
+      "inputs": []
+    }
+  ]
+}

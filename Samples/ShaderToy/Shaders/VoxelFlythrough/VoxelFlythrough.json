@@ -1,0 +1,16 @@
+{
+  "passes": [
+    {
+      "name": "Image",
+      "shader": "VoxelFlythrough.glsl",
+      "inputs": [
+        {
+          "name": "Resources\\RustyMetal.jpg",
+          "filter": "mipmap",
+          "wrap": "repeat",
+          "vflip": true
+        }
+      ]
+    }
+  ]
+}

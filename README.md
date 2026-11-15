@@ -1,5 +1,13 @@
 # SweetDream
 
+A C++20 Vulkan framework with runtime GLSL compilation, SDL3 windows, and ImGui/ImPlot integration.
+
+## Samples
+
+- HelloTriangle: Vulkan triangle with ImGui/ImPlot.
+- [ShaderToy](Samples/ShaderToy/README.md): Run Shadertoy effects on Vulkan with
+  JSON-configured passes, textures, and feedback.
+
 ## SDL3
 
 SDL3 support is opt-in. The project can use SDL 3.4.14 built locally or an

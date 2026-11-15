@@ -202,9 +202,11 @@ protected:
         }
 
         SD_LOG(info, "Logical device created on '{}'", m_window->GetDevice()->GetName());
-        if (!m_window->CreateSwapchain())
+        const vk::Result swapchainResult = m_window->CreateSwapchain();
+        if (swapchainResult != vk::Result::eSuccess)
         {
-            throw std::runtime_error("Failed to create Vulkan swapchain");
+            throw std::runtime_error("Failed to create Vulkan swapchain: " +
+                                     vk::to_string(swapchainResult));
         }
 
         CreateRenderingResources();
@@ -380,10 +382,26 @@ protected:
 private:
     [[nodiscard]] bool RecreateSwapchainResources()
     {
-        if (!m_window || !m_window->CreateSwapchain())
+        if (!m_window)
         {
+            SD_LOG(err, "HelloTriangle swapchain recreation requires a window");
+            RequestExit(EXIT_FAILURE);
             return false;
         }
+        const vk::Result result = m_window->CreateSwapchain();
+        if (result == vk::Result::eNotReady || result == vk::Result::eErrorSurfaceLostKHR ||
+            result == vk::Result::eErrorOutOfDateKHR)
+        {
+            SetEventWaitTimeout(16);
+            return false;
+        }
+        if (result != vk::Result::eSuccess)
+        {
+            SD_LOG(err, "HelloTriangle swapchain recreation failed: {}", vk::to_string(result));
+            RequestExit(EXIT_FAILURE);
+            return false;
+        }
+        SetEventWaitTimeout(1);
 
         m_gui.OnSwapchainRecreated();
         const vk::Format format = m_window->GetSwapchain()->GetImageFormat();

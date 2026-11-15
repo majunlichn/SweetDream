@@ -316,11 +316,16 @@ bool VulkanWindow::HasDeviceSurfaceSupport(VulkanDevice* device, VulkanSurface* 
     }
 }
 
-bool VulkanWindow::RecreateLostSurface()
+bool VulkanWindow::HandleSurfaceLost()
 {
     if (!m_surfaceLost)
     {
-        return m_surface != nullptr;
+        if (m_surface)
+        {
+            return true;
+        }
+        SD_LOG(err, "VulkanWindow::HandleSurfaceLost requires a Vulkan surface");
+        return false;
     }
     if (!IsCreated() || ((GetFlags() & SDL_WINDOW_VULKAN) == 0) || !m_instance)
     {
@@ -333,74 +338,63 @@ bool VulkanWindow::RecreateLostSurface()
     DestroySwapchain();
     m_surface.reset();
 
-    if (!CreateVulkanSurface(m_instance))
-    {
-        return false;
-    }
-    if (m_device && !HasDeviceSurfaceSupport(m_device.get(), m_surface.get()))
-    {
-        SD_LOG(err,
-               "VulkanWindow device graphics queue cannot present to the recreated surface");
-        m_surface.reset();
-        m_surfaceLost = true;
-        return false;
-    }
-
-    return true;
+    return CreateVulkanSurface(m_instance);
 }
 
-bool VulkanWindow::CreateSwapchain(const SwapchainConfig& config)
+vk::Result VulkanWindow::CreateSwapchain(const SwapchainConfig& config)
 {
     m_swapchainConfig = config;
     return CreateSwapchain();
 }
 
-bool VulkanWindow::CreateSwapchain()
+vk::Result VulkanWindow::CreateSwapchain()
 {
     if (m_swapchainImageAcquired)
     {
         SD_LOG(err, "VulkanWindow::CreateSwapchain called while a swapchain image is acquired");
-        return false;
+        return vk::Result::eErrorInitializationFailed;
     }
-    if (m_surfaceLost && !RecreateLostSurface())
+    if (m_surfaceLost && !HandleSurfaceLost())
     {
-        return false;
+        return vk::Result::eErrorInitializationFailed;
     }
     if (!IsCreated() || !m_device || !m_surface)
     {
         SD_LOG(err,
                "VulkanWindow::CreateSwapchain requires a created window, Vulkan surface, "
                "and device");
-        return false;
+        return vk::Result::eErrorInitializationFailed;
     }
     if ((GetFlags() & SDL_WINDOW_VULKAN) == 0)
     {
         SD_LOG(err, "VulkanWindow::CreateSwapchain requires SDL_WINDOW_VULKAN");
-        return false;
+        return vk::Result::eErrorInitializationFailed;
     }
-    if (!HasDeviceSurfaceSupport(m_device.get(), m_surface.get()))
+    if ((GetFlags() & SDL_WINDOW_MINIMIZED) != 0)
     {
-        SD_LOG(err,
-               "VulkanWindow::CreateSwapchain requires a graphics queue that can present "
-               "to the window surface");
-        return false;
+        return vk::Result::eNotReady;
     }
 
     const SwapchainConfig& config = m_swapchainConfig;
     if (config.minImageCount == 0)
     {
         SD_LOG(err, "VulkanWindow::CreateSwapchain requires minImageCount > 0");
-        return false;
+        return vk::Result::eErrorInitializationFailed;
     }
 
     int pixelWidth = 0;
     int pixelHeight = 0;
-    if (!GetSizeInPixels(&pixelWidth, &pixelHeight) || (pixelWidth <= 0) || (pixelHeight <= 0))
+    if (!GetSizeInPixels(&pixelWidth, &pixelHeight))
+    {
+        SD_LOG(err, "VulkanWindow::CreateSwapchain failed to query window pixel size");
+        return vk::Result::eErrorInitializationFailed;
+    }
+    if ((pixelWidth <= 0) || (pixelHeight <= 0))
     {
         SD_LOG(warn,
                "VulkanWindow::CreateSwapchain skipped because the window pixel extent is "
                "zero");
-        return false;
+        return vk::Result::eNotReady;
     }
 
     vk::SurfaceCapabilitiesKHR capabilities;
@@ -409,6 +403,14 @@ bool VulkanWindow::CreateSwapchain()
     try
     {
         const vk::SurfaceKHR surface = m_surface->GetHandle();
+        if (!m_device->GetSurfaceSupport(
+                surface, m_device->GetQueueFamilyIndex(VulkanQueueFamily::Graphics)))
+        {
+            SD_LOG(err,
+                   "VulkanWindow::CreateSwapchain requires a graphics queue that can present "
+                   "to the window surface");
+            return vk::Result::eErrorInitializationFailed;
+        }
         capabilities = m_device->GetCapabilities(surface);
         surfaceFormats = m_device->GetSurfaceFormats(surface);
         presentModes = m_device->GetPresentModes(surface);
@@ -426,24 +428,24 @@ bool VulkanWindow::CreateSwapchain()
             SD_LOG(err, "VulkanWindow::CreateSwapchain surface query failed: {}",
                    exception.what());
         }
-        return false;
+        return static_cast<vk::Result>(exception.code().value());
     }
 
     if ((capabilities.maxImageExtent.width == 0) || (capabilities.maxImageExtent.height == 0))
     {
         SD_LOG(warn,
                "VulkanWindow::CreateSwapchain skipped because the surface extent is zero");
-        return false;
+        return vk::Result::eNotReady;
     }
     if (surfaceFormats.empty())
     {
         SD_LOG(err, "VulkanWindow::CreateSwapchain found no surface formats");
-        return false;
+        return vk::Result::eErrorInitializationFailed;
     }
     if (presentModes.empty())
     {
         SD_LOG(err, "VulkanWindow::CreateSwapchain found no present modes");
-        return false;
+        return vk::Result::eErrorInitializationFailed;
     }
 
     const vk::Extent2D windowSizeInPixels{static_cast<uint32_t>(pixelWidth),
@@ -478,10 +480,10 @@ bool VulkanWindow::CreateSwapchain()
         {
             WaitIdle();
         }
-        catch (const std::exception& exception)
+        catch (const vk::SystemError& exception)
         {
             SD_LOG(err, "VulkanWindow::CreateSwapchain WaitIdle failed: {}", exception.what());
-            return false;
+            return static_cast<vk::Result>(exception.code().value());
         }
     }
 
@@ -519,13 +521,13 @@ bool VulkanWindow::CreateSwapchain()
         {
             SD_LOG(err, "VulkanWindow::CreateSwapchain failed: {}", exception.what());
         }
-        return false;
+        return static_cast<vk::Result>(exception.code().value());
     }
     catch (const std::exception& exception)
     {
         DestroySwapchain();
         SD_LOG(err, "VulkanWindow::CreateSwapchain failed: {}", exception.what());
-        return false;
+        return vk::Result::eErrorUnknown;
     }
 
     // The replacement is valid. Rebuild synchronization before releasing the
@@ -535,12 +537,17 @@ bool VulkanWindow::CreateSwapchain()
     m_renderCompleteSemaphores.clear();
     DestroyFrameResources();
 
-    if (!CreateFrameResources() || !CreateRenderCompleteSemaphores())
+    vk::Result result = CreateFrameResources();
+    if (result == vk::Result::eSuccess)
+    {
+        result = CreateRenderCompleteSemaphores();
+    }
+    if (result != vk::Result::eSuccess)
     {
         m_renderCompleteSemaphores.clear();
         DestroyFrameResources();
         m_swapchain.reset();
-        return false;
+        return result;
     }
 
     previous.reset();
@@ -552,7 +559,7 @@ bool VulkanWindow::CreateSwapchain()
            m_swapchain->GetImageWidth(), m_swapchain->GetImageHeight(),
            m_swapchain->GetImageCount(), vk::to_string(m_swapchain->GetImageFormat()),
            vk::to_string(m_swapchain->GetPresentMode()), config.vsync);
-    return true;
+    return vk::Result::eSuccess;
 }
 
 void VulkanWindow::WaitIdle()
@@ -587,11 +594,12 @@ void VulkanWindow::DestroySwapchain()
     m_swapchain.reset();
 }
 
-bool VulkanWindow::CreateFrameResources()
+vk::Result VulkanWindow::CreateFrameResources()
 {
     if (!m_device)
     {
-        return false;
+        SD_LOG(err, "VulkanWindow::CreateFrameResources requires a Vulkan device");
+        return vk::Result::eErrorInitializationFailed;
     }
 
     try
@@ -608,21 +616,28 @@ bool VulkanWindow::CreateFrameResources()
 
         m_frameSlots = std::move(frameSlots);
     }
+    catch (const vk::SystemError& exception)
+    {
+        SD_LOG(err, "VulkanWindow::CreateFrameResources failed: {}", exception.what());
+        DestroyFrameResources();
+        return static_cast<vk::Result>(exception.code().value());
+    }
     catch (const std::exception& exception)
     {
         SD_LOG(err, "VulkanWindow::CreateFrameResources failed: {}", exception.what());
         DestroyFrameResources();
-        return false;
+        return vk::Result::eErrorUnknown;
     }
 
-    return true;
+    return vk::Result::eSuccess;
 }
 
-bool VulkanWindow::CreateRenderCompleteSemaphores()
+vk::Result VulkanWindow::CreateRenderCompleteSemaphores()
 {
     if (!m_device || !m_swapchain)
     {
-        return false;
+        SD_LOG(err, "VulkanWindow::CreateRenderCompleteSemaphores requires a device and swapchain");
+        return vk::Result::eErrorInitializationFailed;
     }
 
     try
@@ -635,14 +650,21 @@ bool VulkanWindow::CreateRenderCompleteSemaphores()
         }
         m_renderCompleteSemaphores = std::move(semaphores);
     }
+    catch (const vk::SystemError& exception)
+    {
+        SD_LOG(err, "VulkanWindow::CreateRenderCompleteSemaphores failed: {}",
+               exception.what());
+        m_renderCompleteSemaphores.clear();
+        return static_cast<vk::Result>(exception.code().value());
+    }
     catch (const std::exception& exception)
     {
         SD_LOG(err, "VulkanWindow::CreateRenderCompleteSemaphores failed: {}",
                exception.what());
         m_renderCompleteSemaphores.clear();
-        return false;
+        return vk::Result::eErrorUnknown;
     }
-    return true;
+    return vk::Result::eSuccess;
 }
 
 void VulkanWindow::DestroyFrameResources()
