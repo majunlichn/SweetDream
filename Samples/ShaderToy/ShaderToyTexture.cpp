@@ -1,8 +1,8 @@
 #include "ShaderToyTexture.h"
 
-#include <SweetDream/Core/API/Vulkan/VulkanBuffer.h>
-#include <SweetDream/Core/API/Vulkan/VulkanFence.h>
-#include <SweetDream/Core/API/Vulkan/VulkanQueue.h>
+#include <SweetDream/GPU/Vulkan/VulkanBuffer.h>
+#include <SweetDream/GPU/Vulkan/VulkanFence.h>
+#include <SweetDream/GPU/Vulkan/VulkanQueue.h>
 #include <SweetDream/Core/IO/Logging.h>
 
 #include <rad/IO/Image.h>

@@ -1,6 +1,6 @@
 #include "ShaderToyRenderer.h"
 
-#include <SweetDream/Core/API/Vulkan/VulkanQueue.h>
+#include <SweetDream/GPU/Vulkan/VulkanQueue.h>
 #include <SweetDream/Shader/GLSLCompiler.h>
 
 #include <rad/IO/File.h>

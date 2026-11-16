@@ -1,6 +1,6 @@
 #pragma once
 
-#include <SweetDream/Core/API/Vulkan/VulkanCommon.h>
+#include <SweetDream/GPU/Vulkan/VulkanCommon.h>
 
 #include <imgui.h>
 

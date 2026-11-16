@@ -1,13 +1,13 @@
 #include <SweetDream/Gui/VulkanWindow.h>
 
-#include <SweetDream/Core/API/Vulkan/VulkanDevice.h>
-#include <SweetDream/Core/API/Vulkan/VulkanFence.h>
-#include <SweetDream/Core/API/Vulkan/VulkanImage.h>
-#include <SweetDream/Core/API/Vulkan/VulkanInstance.h>
-#include <SweetDream/Core/API/Vulkan/VulkanQueue.h>
-#include <SweetDream/Core/API/Vulkan/VulkanSemaphore.h>
-#include <SweetDream/Core/API/Vulkan/VulkanSurface.h>
-#include <SweetDream/Core/API/Vulkan/VulkanSwapchain.h>
+#include <SweetDream/GPU/Vulkan/VulkanDevice.h>
+#include <SweetDream/GPU/Vulkan/VulkanFence.h>
+#include <SweetDream/GPU/Vulkan/VulkanImage.h>
+#include <SweetDream/GPU/Vulkan/VulkanInstance.h>
+#include <SweetDream/GPU/Vulkan/VulkanQueue.h>
+#include <SweetDream/GPU/Vulkan/VulkanSemaphore.h>
+#include <SweetDream/GPU/Vulkan/VulkanSurface.h>
+#include <SweetDream/GPU/Vulkan/VulkanSwapchain.h>
 #include <SweetDream/Core/IO/Logging.h>
 
 #include <SDL3/SDL.h>

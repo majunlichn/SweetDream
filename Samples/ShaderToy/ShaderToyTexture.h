@@ -1,7 +1,7 @@
 #pragma once
 
-#include <SweetDream/Core/API/Vulkan/VulkanCommand.h>
-#include <SweetDream/Core/API/Vulkan/VulkanImage.h>
+#include <SweetDream/GPU/Vulkan/VulkanCommand.h>
+#include <SweetDream/GPU/Vulkan/VulkanImage.h>
 
 #include <rad/System/FileSystem.h>
 

@@ -3,12 +3,12 @@
 #include "ShaderToyConfig.h"
 #include "ShaderToyTexture.h"
 
-#include <SweetDream/Core/API/Vulkan/VulkanBuffer.h>
-#include <SweetDream/Core/API/Vulkan/VulkanCommand.h>
-#include <SweetDream/Core/API/Vulkan/VulkanDescriptor.h>
-#include <SweetDream/Core/API/Vulkan/VulkanImage.h>
-#include <SweetDream/Core/API/Vulkan/VulkanPipeline.h>
-#include <SweetDream/Core/API/Vulkan/VulkanSampler.h>
+#include <SweetDream/GPU/Vulkan/VulkanBuffer.h>
+#include <SweetDream/GPU/Vulkan/VulkanCommand.h>
+#include <SweetDream/GPU/Vulkan/VulkanDescriptor.h>
+#include <SweetDream/GPU/Vulkan/VulkanImage.h>
+#include <SweetDream/GPU/Vulkan/VulkanPipeline.h>
+#include <SweetDream/GPU/Vulkan/VulkanSampler.h>
 
 #include <cstddef>
 

@@ -1,15 +1,15 @@
 #include "MainWindow.h"
 
-#include <SweetDream/Core/API/Vulkan/VulkanBuffer.h>
-#include <SweetDream/Core/API/Vulkan/VulkanCommand.h>
-#include <SweetDream/Core/API/Vulkan/VulkanDescriptor.h>
-#include <SweetDream/Core/API/Vulkan/VulkanDevice.h>
-#include <SweetDream/Core/API/Vulkan/VulkanImage.h>
-#include <SweetDream/Core/API/Vulkan/VulkanInstance.h>
-#include <SweetDream/Core/API/Vulkan/VulkanPipeline.h>
-#include <SweetDream/Core/API/Vulkan/VulkanQueue.h>
-#include <SweetDream/Core/API/Vulkan/VulkanSwapchain.h>
-#include <SweetDream/Core/API/Vulkan/VulkanUploader.h>
+#include <SweetDream/GPU/Vulkan/VulkanBuffer.h>
+#include <SweetDream/GPU/Vulkan/VulkanCommand.h>
+#include <SweetDream/GPU/Vulkan/VulkanDescriptor.h>
+#include <SweetDream/GPU/Vulkan/VulkanDevice.h>
+#include <SweetDream/GPU/Vulkan/VulkanImage.h>
+#include <SweetDream/GPU/Vulkan/VulkanInstance.h>
+#include <SweetDream/GPU/Vulkan/VulkanPipeline.h>
+#include <SweetDream/GPU/Vulkan/VulkanQueue.h>
+#include <SweetDream/GPU/Vulkan/VulkanSwapchain.h>
+#include <SweetDream/GPU/Vulkan/VulkanUploader.h>
 #include <SweetDream/Core/IO/Logging.h>
 #include <SweetDream/Gui/GuiContext.h>
 #include <SweetDream/Platform/Application.h>

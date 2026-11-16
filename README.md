@@ -2,6 +2,21 @@
 
 A C++20 Vulkan framework with runtime GLSL compilation, SDL3 windows, and ImGui/ImPlot integration.
 
+## Source layout
+
+Modules live under `Source/SweetDream`:
+
+- `Core` - shared foundation utilities, independent of GPU, platform, and GUI code.
+- `GPU/Vulkan` - Vulkan device, resource, command, pipeline, and synchronization
+  wrappers; depends on `Core`.
+- `Shader` - GLSL compilation and SPIR-V tools.
+- `Platform` - application lifecycle and platform events.
+- `Gui` - windows and ImGui/ImPlot integration, connecting platform and GPU code.
+
+Vulkan headers are included as `<SweetDream/GPU/Vulkan/VulkanDevice.h>`, for
+example. These directories remain part of the single `SweetDream::SweetDream`
+library target.
+
 ## Samples
 
 - HelloTriangle: Vulkan triangle with ImGui/ImPlot.
