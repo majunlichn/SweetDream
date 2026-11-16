@@ -1,57 +1,88 @@
 # SweetDream
 
-A C++20 Vulkan framework with runtime GLSL compilation, SDL3 windows, and ImGui/ImPlot integration.
+A C++20 application development framework, exposed as the CMake target
+`SweetDream::SweetDream`.
 
-## Source layout
+## Goals
 
-Modules live under `Source/SweetDream`:
+- Provide reusable building blocks for desktop applications and interactive tools.
+- Integrate application lifecycle, windows, GPU resources, shaders, and user interfaces.
+- Keep APIs clear and resource ownership explicit.
 
-- `Core` - shared foundation utilities, independent of GPU, platform, and GUI code.
-- `GPU/Vulkan` - Vulkan device, resource, command, pipeline, and synchronization
-  wrappers; depends on `Core`.
-- `Shader` - GLSL compilation and SPIR-V tools.
-- `Platform` - application lifecycle and platform events.
-- `Gui` - windows and ImGui/ImPlot integration, connecting platform and GPU code.
+## Style
 
-Vulkan headers are included as `<SweetDream/GPU/Vulkan/VulkanDevice.h>`, for
-example. These directories remain part of the single `SweetDream::SweetDream`
-library target.
+- C++20 APIs in the `sd` namespace, with PascalCase types and functions.
+- RAII and reference-counted ownership for managed resources.
+- Build on radcpp, Vulkan, SDL3, Dear ImGui, and ImPlot rather than duplicate their functionality.
+
+## Features
+
+- **Core**: shared strings and logging utilities, independent of GPU and GUI code.
+- **GPU/Vulkan**: devices, memory allocation, resources, commands, pipelines, and synchronization.
+- **Shader**: runtime GLSL compilation; SPIR-V validation, assembly, and disassembly.
+- **Platform**: SDL3 application lifecycle, event dispatch, and frame processing.
+- **Gui**: windows, Vulkan presentation, and Dear ImGui/ImPlot integration.
+
+Modules live under [Source/SweetDream](Source/SweetDream) and belong to one static library.
+The public include root is `Source`, e.g. `<SweetDream/GPU/Vulkan/VulkanDevice.h>`.
+
+## Build
+
+- Requires CMake 3.25+, a C++20 compiler, and the dependencies in [vcpkg.json](vcpkg.json).
+- Install the Vulkan SDK, including `glslc`, shaderc, and SPIRV-Tools; set `VULKAN_SDK`.
+- Set `VCPKG_ROOT` to use its toolchain automatically; the first configure installs dependencies.
+- GUI support requires SDL3 3.4.14 or newer and the Dear ImGui/ImPlot submodules.
+
+Command examples use Bash syntax.
+
+From the repository root, with a **multi-config** generator
+(Visual Studio or Ninja Multi-Config):
+
+```bash
+git submodule update --init --recursive
+cmake -S . -B build
+cmake --build build --config Debug
+```
+
+For a **single-config** generator (Ninja or Unix Makefiles), configure with
+`-DCMAKE_BUILD_TYPE=Debug` and omit `--config Debug` when building.
+Use the same configuration throughout.
+
+- `SD_BUILD_GUI` defaults to `ON`; missing GUI dependencies disable it with a warning.
+  Set `-DSD_BUILD_GUI=OFF` to build without Platform and Gui.
+- `SD_BUILD_SAMPLES` defaults to `ON`; samples require GUI support.
+
+### SDL3
+
+Use an existing SDL3 CMake package or build the pinned release locally before configuring:
+
+```bash
+python ThirdParty/SDL/build.py --config Debug
+```
+
+The script requires Python 3 and Git. It keeps the checkout, build tree, and installation
+under `ThirdParty/SDL/source`, `ThirdParty/SDL/build`, and `ThirdParty/SDL/installed`.
+Use `--clean` to rebuild from a clean build/install tree.
+
+Set `SDL3_DIR` to the directory containing `SDL3Config.cmake` to select an installation.
+Otherwise, CMake searches the local install first, then system/package-manager locations.
 
 ## Samples
 
-- HelloTriangle: Vulkan triangle with ImGui/ImPlot.
-- [ShaderToy](Samples/ShaderToy/README.md): Run Shadertoy effects on Vulkan with
-  JSON-configured passes, textures, and feedback.
+- [HelloTriangle](Samples/HelloTriangle): Vulkan triangle with Dear ImGui/ImPlot.
+- [ShaderToy](Samples/ShaderToy/README.md): Shadertoy effects with JSON-configured passes,
+  textures, and feedback.
 
-## SDL3
+**Run samples and tests from the runtime output directory, not the repository root**, to keep
+logs, temporary files, and other test outputs out of the source tree:
 
-SDL3 support is opt-in. The project can use SDL 3.4.14 built locally or an
-SDL3 CMake package supplied by the system, vcpkg, or another package manager.
+- **Multi-config**: `build/bin/<Config>/`, matching the built configuration.
+- **Single-config**: `build/bin/`.
 
-Configure CMake generator with environment variables if necessary:
+For a multi-config Debug build:
 
-```powershell
-$env:CMAKE_GENERATOR="Visual Studio 18 2026"
-$env:CMAKE_GENERATOR_PLATFORM="x64"
+```bash
+cd build/bin/Debug
+./HelloTriangle
+./ShaderToy --frames 60
 ```
-
-To clone, build, and install the pinned release:
-
-```sh
-python ThirdParty/SDL/build.py
-cmake -S . -B build -DSD_BUILD_GUI=ON
-```
-
-The script uses this untracked layout:
-
-- `ThirdParty/SDL/source` - SDL Git checkout at `release-3.4.14`
-- `ThirdParty/SDL/build` - CMake build tree
-- `ThirdParty/SDL/installed` - local install prefix containing the SDL3 package
-
-Pass `--clean` to rebuild from a clean build/install tree, `--config Debug` for
-a debug build, or `--linkage static` for a static-only install.
-
-If the local install is absent, the same configure command searches for an
-SDL3 package on the system. Set `SDL3_DIR` to the directory containing
-`SDL3Config.cmake` to select a specific installation. After discovery,
-consumers can link the imported target `SDL3::SDL3`.

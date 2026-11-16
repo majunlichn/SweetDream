@@ -4,18 +4,27 @@ A Vulkan runner for Shadertoy Image/Buffer effects.
 
 ## Usage
 
-From the repository root:
+Command examples use Bash syntax.
 
-```powershell
+Build from the repository root (multi-config Debug example):
+
+```bash
 cmake -S . -B build -DSD_BUILD_GUI=ON
 cmake --build build --config Debug --target ShaderToy
+```
 
+Run from the **runtime output directory**, not the repository root, to keep logs,
+temporary files, and other test outputs out of the source tree. For a single-config
+build, use `build/bin` instead.
+
+```bash
+cd build/bin/Debug
 # Light Cycle: no external resources
-.\build\bin\Debug\ShaderToy.exe --width 1280 --height 720
+./ShaderToy --width 1280 --height 720
 
 # Voxel Flythrough: download RustyMetal first
-python .\build\bin\Debug\ShaderToy\download_resources.py
-.\build\bin\Debug\ShaderToy.exe --config .\Samples\ShaderToy\Shaders\VoxelFlythrough\VoxelFlythrough.json
+python ShaderToy/download_resources.py
+./ShaderToy --config ShaderToy/Shaders/VoxelFlythrough/VoxelFlythrough.json
 ```
 
 Defaults: Light Cycle, 1280x720. `--frames N` limits rendering; Escape exits.
