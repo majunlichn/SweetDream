@@ -80,6 +80,18 @@ public:
     {
         return m_properties;
     }
+    [[nodiscard]] const vk::PhysicalDeviceVulkan11Properties& GetVulkan11Properties() const noexcept
+    {
+        return m_vk11Properties;
+    }
+    [[nodiscard]] const vk::PhysicalDeviceVulkan13Properties& GetVulkan13Properties() const noexcept
+    {
+        return m_vk13Properties;
+    }
+    [[nodiscard]] const vk::PhysicalDeviceVulkan13Features& GetVulkan13Features() const noexcept
+    {
+        return m_Vulkan13Features;
+    }
 
     [[nodiscard]] vk::SurfaceCapabilitiesKHR GetCapabilities(vk::SurfaceKHR surface) const;
     [[nodiscard]] std::vector<vk::SurfaceFormatKHR> GetSurfaceFormats(

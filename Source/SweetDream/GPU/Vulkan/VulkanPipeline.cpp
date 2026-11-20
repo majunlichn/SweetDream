@@ -423,6 +423,13 @@ VulkanComputePipeline::VulkanComputePipeline(
         static_cast<vk::PipelineShaderStageCreateInfo>(m_info.m_stage);
     createInfo.layout = m_info.m_layout->GetHandle();
 
+    const vk::PipelineShaderStageRequiredSubgroupSizeCreateInfo subgroupSize{
+        m_info.m_requiredSubgroupSize};
+    if (m_info.m_requiredSubgroupSize != 0)
+    {
+        createInfo.stage.pNext = &subgroupSize;
+    }
+
     m_handle =
         m_device->GetHandle()
             .createComputePipeline(nullptr, createInfo, nullptr, GetDispatcher())

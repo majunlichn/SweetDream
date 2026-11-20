@@ -25,6 +25,9 @@ cd build/bin/Debug
 # Voxel Flythrough: download RustyMetal first
 python ShaderToy/download_resources.py
 ./ShaderToy --config ShaderToy/Shaders/VoxelFlythrough/VoxelFlythrough.json
+
+# Mipmap test: inspect every level of a 133x73 BufferA
+./ShaderToy --config ShaderToy/Shaders/MipmapTest/MipmapTest-133x73.json
 ```
 
 Defaults: Light Cycle, 1280x720. `--frames N` limits rendering; Escape exits.
@@ -36,6 +39,28 @@ Resizing resets time, frame numbering, and Buffer contents.
 
 Assets are copied to `ShaderToy` beside the executable. The downloader saves to
 its adjacent `Resources/` directory, independent of the working directory.
+
+### Mipmap test
+
+[MipmapTest-BufferA.glsl](./Shaders/MipmapTest/MipmapTest-BufferA.glsl) draws fine
+and coarse colored checks over a gradient in BufferA. Use one of these configs,
+or change `BufferA.size` to try another size.
+
+| Config | Mip levels | What it exercises |
+| --- | ---: | --- |
+| [MipmapTest-133x73.json](./Shaders/MipmapTest/MipmapTest-133x73.json) | 8 | Odd, non-power-of-two dimensions on both axes |
+| [MipmapTest-256x128.json](./Shaders/MipmapTest/MipmapTest-256x128.json) | 9 | Even, power-of-two dimensions; height reaches 1 before width |
+| [MipmapTest-255x257.json](./Shaders/MipmapTest/MipmapTest-255x257.json) | 9 | Dimensions just below and above 256; width reaches 1 before height |
+| [MipmapTest-257x1.json](./Shaders/MipmapTest/MipmapTest-257x1.json) | 9 | Single row; only width shrinks |
+| [MipmapTest-1x115.json](./Shaders/MipmapTest/MipmapTest-1x115.json) | 7 | Single column; only height shrinks |
+| [MipmapTest-1x1.json](./Shaders/MipmapTest/MipmapTest-1x1.json) | 1 | Only the base level; nothing to downsample |
+
+[MipmapTest.glsl](./Shaders/MipmapTest/MipmapTest.glsl) sizes its grid to fit
+the expected mip chain, with up to four tiles per row.
+Fine checks should disappear before coarse ones, and the last tile should be a
+single gray texel. Each tile has a green border if its size
+and center sample match the expected values, including a frame-dependent alpha
+check for stale data; red marks a failure.
 
 ## Effect JSON
 
@@ -69,7 +94,12 @@ asset directory. Absolute paths are accepted.
 - Earlier Buffer inputs read the current frame; self/later inputs read the
   previous frame. Buffers start cleared; missing channels sample zero.
 - `filter`: `nearest`, `linear` (default), or `mipmap` (trilinear).
-  Mipmaps are generated on demand; Buffer mipmaps refresh after rendering.
+  File mipmaps are generated during upload; Buffer mipmaps refresh after rendering
+  into each ping-pong target. Both use `VulkanMipmap` and require a compute-capable
+  graphics queue and storage image support for the respective format. Aligned
+  images can generate up to six levels per dispatch on devices with full
+  32-lane compute subgroups and shuffle support; otherwise they use the
+  general path.
 - `wrap`: `clamp` (default) or `repeat`.
 - `vflip`: file textures only; false by default. True flips decoded rows before upload.
 - Optional Buffer `size: [width, height]` overrides screen resolution.

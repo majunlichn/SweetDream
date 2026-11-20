@@ -7,10 +7,12 @@
 #include <SweetDream/GPU/Vulkan/VulkanCommand.h>
 #include <SweetDream/GPU/Vulkan/VulkanDescriptor.h>
 #include <SweetDream/GPU/Vulkan/VulkanImage.h>
+#include <SweetDream/GPU/Vulkan/VulkanMipmap.h>
 #include <SweetDream/GPU/Vulkan/VulkanPipeline.h>
 #include <SweetDream/GPU/Vulkan/VulkanSampler.h>
 
 #include <cstddef>
+#include <memory>
 
 namespace shadertoy
 {
@@ -54,6 +56,7 @@ private:
         rad::Ref<sd::VulkanImage> image;
         rad::Ref<sd::VulkanImageView> attachmentView;
         rad::Ref<sd::VulkanImageView> sampledView;
+        std::unique_ptr<sd::VulkanMipmap> mipmap;
         float time = 0.0f;
     };
 
@@ -77,7 +80,7 @@ private:
         bool mipmaps = false;
     };
 
-    RenderTarget CreateRenderTarget(vk::Extent2D extent, bool mipmaps = false);
+    void CreateRenderTarget(RenderTarget& target, vk::Extent2D extent, bool mipmaps = false);
     void InitializeTargets();
     void CreatePipeline(std::size_t passIndex, vk::Format format);
     void UpdatePassResources(std::size_t passIndex, uint32_t frameSlot, const FrameData& frame);

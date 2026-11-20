@@ -21,6 +21,8 @@ namespace
 
 constexpr vk::Format BufferFormat = vk::Format::eR32G32B32A32Sfloat;
 constexpr vk::ImageSubresourceRange ColorRange{vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1};
+constexpr sd::VulkanMipmap::ImageState FragmentSampled{vk::ImageLayout::eShaderReadOnlyOptimal,
+    vk::PipelineStageFlagBits2::eFragmentShader, vk::AccessFlagBits2::eShaderSampledRead};
 
 struct alignas(16) Uniforms
 {
@@ -237,7 +239,7 @@ Renderer::Renderer(sd::VulkanDevice* device, EffectConfig config, CompiledShader
     }
 }
 
-Renderer::RenderTarget Renderer::CreateRenderTarget(vk::Extent2D extent, bool mipmaps)
+void Renderer::CreateRenderTarget(RenderTarget& target, vk::Extent2D extent, bool mipmaps)
 {
     const auto& limits = m_device->GetProperties().limits;
     if (extent.width == 0 || extent.height == 0 ||
@@ -246,30 +248,30 @@ Renderer::RenderTarget Renderer::CreateRenderTarget(vk::Extent2D extent, bool mi
     {
         throw std::invalid_argument("Buffer extent exceeds Vulkan device limits");
     }
-    const uint32_t levels = mipmaps ? GetMipLevelCount(extent) : 1;
-    if (levels > 1)
-    {
-        CheckMipmapSupport(m_device.get(), BufferFormat);
-    }
+    const uint32_t levels = mipmaps ? sd::VulkanMipmap::GetMipLevelCount(extent) : 1;
     auto usage = vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eSampled |
                  vk::ImageUsageFlagBits::eTransferDst;
     if (levels > 1)
     {
-        usage |= vk::ImageUsageFlagBits::eTransferSrc;
+        usage |= vk::ImageUsageFlagBits::eStorage;
     }
-    RenderTarget target;
     target.image = m_device->CreateImage2D(
         extent.width, extent.height, BufferFormat, usage, VMA_MEMORY_USAGE_AUTO, 0, levels);
     target.attachmentView = target.image->CreateView2D();
     target.sampledView = levels == 1 ? target.attachmentView : target.image->CreateView2D(0, levels);
-    return target;
+    if (!target.mipmap)
+    {
+        target.mipmap = std::make_unique<sd::VulkanMipmap>(m_device.get());
+    }
+    target.mipmap->SetImage(target.image.get());
+    target.time = 0.0f;
 }
 
 void Renderer::Resize(vk::Extent2D extent, vk::Format screenFormat)
 {
     const bool formatChanged = m_screenFormat != screenFormat;
     m_screenFormat = screenFormat;
-    m_black = CreateRenderTarget({1, 1});
+    CreateRenderTarget(m_black, {1, 1});
     for (std::size_t i = 0; i < m_passes.size(); ++i)
     {
         auto& runtime = m_passes[i];
@@ -282,7 +284,7 @@ void Renderer::Resize(vk::Extent2D extent, vk::Format screenFormat)
         {
             for (auto& target : runtime.targets)
             {
-                target = CreateRenderTarget(runtime.extent, runtime.mipmaps);
+                CreateRenderTarget(target, runtime.extent, runtime.mipmaps);
             }
         }
         if (!runtime.pipeline || (!renderToTexture && formatChanged))
@@ -454,10 +456,11 @@ void Renderer::Render(sd::VulkanCommandBuffer* command, sd::VulkanImageView* scr
         command->EndRendering();
         if (renderToTexture)
         {
-            PrepareTextureForSampling(command, output.image.get(),
-                                      vk::ImageLayout::eColorAttachmentOptimal,
-                                      vk::PipelineStageFlagBits2::eColorAttachmentOutput,
-                                      vk::AccessFlagBits2::eColorAttachmentWrite, true);
+            output.mipmap->Execute(
+                command,
+                {vk::ImageLayout::eColorAttachmentOptimal, vk::PipelineStageFlagBits2::eColorAttachmentOutput,
+                 vk::AccessFlagBits2::eColorAttachmentWrite},
+                FragmentSampled, FragmentSampled);
             output.time = frame.time;
         }
     }

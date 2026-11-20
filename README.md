@@ -18,7 +18,8 @@ A C++20 application development framework, exposed as the CMake target
 ## Features
 
 - **Core**: shared strings and logging utilities, independent of GPU and GUI code.
-- **GPU/Vulkan**: devices, memory allocation, resources, commands, pipelines, and synchronization.
+- **GPU/Vulkan**: devices, memory allocation, resources, commands, pipelines, synchronization,
+  and mipmap generation.
 - **Shader**: runtime GLSL compilation; SPIR-V validation, assembly, and disassembly.
 - **Platform**: SDL3 application lifecycle, event dispatch, and frame processing.
 - **Gui**: windows, Vulkan presentation, and Dear ImGui/ImPlot integration.

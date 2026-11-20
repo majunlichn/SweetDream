@@ -1,0 +1,10 @@
+{
+  "passes": [
+    { "name": "BufferA", "shader": "MipmapTest-BufferA.glsl", "size": [133, 73] },
+    {
+      "name": "Image",
+      "shader": "MipmapTest.glsl",
+      "inputs": [{ "name": "BufferA", "filter": "mipmap" }]
+    }
+  ]
+}

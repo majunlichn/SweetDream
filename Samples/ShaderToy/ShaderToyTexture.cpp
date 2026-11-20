@@ -1,7 +1,9 @@
 #include "ShaderToyTexture.h"
 
 #include <SweetDream/GPU/Vulkan/VulkanBuffer.h>
+#include <SweetDream/GPU/Vulkan/VulkanCommand.h>
 #include <SweetDream/GPU/Vulkan/VulkanFence.h>
+#include <SweetDream/GPU/Vulkan/VulkanMipmap.h>
 #include <SweetDream/GPU/Vulkan/VulkanQueue.h>
 #include <SweetDream/Core/IO/Logging.h>
 
@@ -9,7 +11,6 @@
 #include <rad/IO/File.h>
 
 #include <algorithm>
-#include <bit>
 #include <stdexcept>
 
 namespace shadertoy
@@ -21,27 +22,6 @@ constexpr vk::ImageSubresourceRange BaseLevel{vk::ImageAspectFlagBits::eColor, 0
 constexpr vk::Format TextureFormat = vk::Format::eR8G8B8A8Unorm;
 
 } // namespace
-
-uint32_t GetMipLevelCount(vk::Extent2D extent)
-{
-    return std::bit_width(std::max(extent.width, extent.height));
-}
-
-void CheckMipmapSupport(sd::VulkanDevice* device, vk::Format format)
-{
-    const auto features = device->GetPhysicalDevice()
-                              .getFormatProperties(format, device->GetDispatcher())
-                              .optimalTilingFeatures;
-    const auto required = vk::FormatFeatureFlagBits::eBlitSrc |
-                          vk::FormatFeatureFlagBits::eBlitDst |
-                          vk::FormatFeatureFlagBits::eSampledImageFilterLinear |
-                          vk::FormatFeatureFlagBits::eTransferSrc;
-    if ((features & required) != required)
-    {
-        throw std::runtime_error("Linear mipmap generation is unsupported for " +
-                                 vk::to_string(format));
-    }
-}
 
 Texture LoadTexture(sd::VulkanDevice* device, const rad::FilePath& path,
                     bool vflip, bool mipmaps)
@@ -83,20 +63,18 @@ Texture LoadTexture(sd::VulkanDevice* device, const rad::FilePath& path,
     {
         throw std::runtime_error("RGBA8 texture upload/sampling is unsupported");
     }
-    const uint32_t levels = mipmaps ? GetMipLevelCount(extent) : 1;
-    if (levels > 1)
-    {
-        CheckMipmapSupport(device, TextureFormat);
-    }
+    const uint32_t levels = mipmaps ? sd::VulkanMipmap::GetMipLevelCount(extent) : 1;
     auto usage = vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eTransferDst;
     if (levels > 1)
     {
-        usage |= vk::ImageUsageFlagBits::eTransferSrc;
+        usage |= vk::ImageUsageFlagBits::eStorage;
     }
     Texture texture;
     texture.image = device->CreateImage2D(
         extent.width, extent.height, TextureFormat, usage, VMA_MEMORY_USAGE_AUTO, 0, levels);
     texture.view = texture.image->CreateView2D(0, levels);
+    sd::VulkanMipmap mipmap(device);
+    mipmap.SetImage(texture.image.get());
 
     const vk::DeviceSize bytes = static_cast<vk::DeviceSize>(extent.width) * extent.height * 4;
     auto staging = device->CreateUploadBuffer(bytes);
@@ -115,9 +93,13 @@ Texture LoadTexture(sd::VulkanDevice* device, const rad::FilePath& path,
     copy.imageExtent = vk::Extent3D{extent.width, extent.height, 1};
     command->CopyBufferToImage(staging->GetHandle(), texture.image->GetHandle(),
                                vk::ImageLayout::eTransferDstOptimal, copy);
-    PrepareTextureForSampling(command.get(), texture.image.get(),
-                              vk::ImageLayout::eTransferDstOptimal,
-                              vk::PipelineStageFlagBits2::eCopy, vk::AccessFlagBits2::eTransferWrite);
+    mipmap.Execute(
+        command.get(),
+        {vk::ImageLayout::eTransferDstOptimal, vk::PipelineStageFlagBits2::eCopy,
+         vk::AccessFlagBits2::eTransferWrite},
+        {},
+        {vk::ImageLayout::eShaderReadOnlyOptimal, vk::PipelineStageFlagBits2::eFragmentShader,
+         vk::AccessFlagBits2::eShaderSampledRead});
     command->End();
     auto fence = device->CreateFence();
     device->GetQueue(sd::VulkanQueueFamily::Graphics)->Submit(command.get(), fence.get());
@@ -128,62 +110,6 @@ Texture LoadTexture(sd::VulkanDevice* device, const rad::FilePath& path,
     SD_LOG(info, "Texture loaded: {}, {}x{}, {} mip levels, vflip={}",
            rad::ToUtf8(path), extent.width, extent.height, levels, vflip);
     return texture;
-}
-
-void PrepareTextureForSampling(sd::VulkanCommandBuffer* command, sd::VulkanImage* image,
-                               vk::ImageLayout baseLayout, vk::PipelineStageFlags2 baseStage,
-                               vk::AccessFlags2 baseAccess, bool initializedMipmaps)
-{
-    int32_t width = static_cast<int32_t>(image->GetWidth());
-    int32_t height = static_cast<int32_t>(image->GetHeight());
-    const uint32_t levels = image->GetMipLevels();
-    for (uint32_t level = 1; level < levels; ++level)
-    {
-        const vk::ImageSubresourceRange sourceRange{
-            vk::ImageAspectFlagBits::eColor, level - 1, 1, 0, 1};
-        const vk::ImageSubresourceRange destinationRange{
-            vk::ImageAspectFlagBits::eColor, level, 1, 0, 1};
-        command->ImageMemoryBarrier(
-            image->GetHandle(), sourceRange,
-            level == 1 ? baseLayout : vk::ImageLayout::eTransferDstOptimal,
-            vk::ImageLayout::eTransferSrcOptimal,
-            level == 1 ? baseStage : vk::PipelineStageFlags2{vk::PipelineStageFlagBits2::eBlit},
-            level == 1 ? baseAccess : vk::AccessFlags2{vk::AccessFlagBits2::eTransferWrite},
-            vk::PipelineStageFlagBits2::eBlit, vk::AccessFlagBits2::eTransferRead);
-        command->ImageMemoryBarrier(
-            image->GetHandle(), destinationRange,
-            initializedMipmaps ? vk::ImageLayout::eShaderReadOnlyOptimal : vk::ImageLayout::eUndefined,
-            vk::ImageLayout::eTransferDstOptimal,
-            initializedMipmaps ? vk::PipelineStageFlagBits2::eAllCommands : vk::PipelineStageFlagBits2::eNone,
-            initializedMipmaps ? vk::AccessFlagBits2::eMemoryRead | vk::AccessFlagBits2::eMemoryWrite
-                               : vk::AccessFlags2{},
-            vk::PipelineStageFlagBits2::eBlit, vk::AccessFlagBits2::eTransferWrite);
-        const int32_t nextWidth = std::max(width / 2, 1);
-        const int32_t nextHeight = std::max(height / 2, 1);
-        vk::ImageBlit blit;
-        blit.srcSubresource = vk::ImageSubresourceLayers{vk::ImageAspectFlagBits::eColor, level - 1, 0, 1};
-        blit.srcOffsets[1] = vk::Offset3D{width, height, 1};
-        blit.dstSubresource = vk::ImageSubresourceLayers{vk::ImageAspectFlagBits::eColor, level, 0, 1};
-        blit.dstOffsets[1] = vk::Offset3D{nextWidth, nextHeight, 1};
-        command->BlitImage(image->GetHandle(), vk::ImageLayout::eTransferSrcOptimal,
-                            image->GetHandle(), vk::ImageLayout::eTransferDstOptimal,
-                            blit, vk::Filter::eLinear);
-        command->ImageMemoryBarrier(
-            image->GetHandle(), sourceRange, vk::ImageLayout::eTransferSrcOptimal,
-            vk::ImageLayout::eShaderReadOnlyOptimal, vk::PipelineStageFlagBits2::eBlit,
-            vk::AccessFlagBits2::eTransferRead, vk::PipelineStageFlagBits2::eFragmentShader,
-            vk::AccessFlagBits2::eShaderSampledRead);
-        width = nextWidth;
-        height = nextHeight;
-    }
-    const vk::ImageSubresourceRange lastRange{vk::ImageAspectFlagBits::eColor, levels - 1, 1, 0, 1};
-    command->ImageMemoryBarrier(
-        image->GetHandle(), lastRange,
-        levels == 1 ? baseLayout : vk::ImageLayout::eTransferDstOptimal,
-        vk::ImageLayout::eShaderReadOnlyOptimal,
-        levels == 1 ? baseStage : vk::PipelineStageFlags2{vk::PipelineStageFlagBits2::eBlit},
-        levels == 1 ? baseAccess : vk::AccessFlags2{vk::AccessFlagBits2::eTransferWrite},
-        vk::PipelineStageFlagBits2::eFragmentShader, vk::AccessFlagBits2::eShaderSampledRead);
 }
 
 } // namespace shadertoy

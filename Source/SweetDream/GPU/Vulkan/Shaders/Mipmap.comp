@@ -1,0 +1,70 @@
+#version 450
+#extension GL_GOOGLE_include_directive : require
+
+#if SD_MIPMAP_FAST
+#extension GL_KHR_shader_subgroup_shuffle : require
+#define SD_MIPMAP_MAX_LEVELS 6
+#else
+#define SD_MIPMAP_MAX_LEVELS 2
+#endif
+
+#if SD_MIPMAP_RGBA8
+#define SD_MIPMAP_FORMAT rgba8
+// Match the UNORM precision of the intermediate mip stored in the image.
+#define NVPRO_PYRAMID_SHARED_TYPE uint
+#define NVPRO_PYRAMID_SHARED_LOAD(sample_, out_) out_ = unpackUnorm4x8(sample_)
+#define NVPRO_PYRAMID_SHARED_STORE(sample_, in_) sample_ = packUnorm4x8(in_)
+#else
+#define SD_MIPMAP_FORMAT rgba32f
+#endif
+
+layout(set = 0, binding = 0, SD_MIPMAP_FORMAT) uniform readonly image2D sourceMip;
+layout(set = 0, binding = 1, SD_MIPMAP_FORMAT) uniform writeonly image2D outputMips[SD_MIPMAP_MAX_LEVELS];
+
+ivec2 mipSize(int level)
+{
+#if SD_MIPMAP_FAST
+    // The fast kernel only queries the size of its input mip.
+    return imageSize(sourceMip);
+#else
+    if (level == 0)
+        return imageSize(sourceMip);
+    if (level == 1)
+        return imageSize(outputMips[0]);
+    return imageSize(outputMips[1]);
+#endif
+}
+
+void storeMip(ivec2 coord, int level, inout vec4 value)
+{
+#if SD_MIPMAP_FAST && SD_MIPMAP_RGBA8
+    // Subsequent subgroup reductions consume the same UNORM values a separate dispatch would read.
+    value = unpackUnorm4x8(packUnorm4x8(value));
+#endif
+    // Constant indices avoid requiring storage image array dynamic indexing.
+    switch (level)
+    {
+        case 1: imageStore(outputMips[0], coord, value); break;
+        case 2: imageStore(outputMips[1], coord, value); break;
+#if SD_MIPMAP_FAST
+        case 3: imageStore(outputMips[2], coord, value); break;
+        case 4: imageStore(outputMips[3], coord, value); break;
+        case 5: imageStore(outputMips[4], coord, value); break;
+        case 6: imageStore(outputMips[5], coord, value); break;
+#endif
+    }
+}
+
+// Each dispatch binds its input as relative level zero.
+#define NVPRO_PYRAMID_IS_FAST_PIPELINE SD_MIPMAP_FAST
+#define NVPRO_PYRAMID_TYPE vec4
+#define NVPRO_PYRAMID_LEVEL_SIZE mipSize
+#define NVPRO_PYRAMID_LOAD(coord, level, out_) out_ = imageLoad(sourceMip, coord)
+#define NVPRO_PYRAMID_STORE(coord, level, in_) storeMip(coord, level, in_)
+#define NVPRO_PYRAMID_REDUCE(a0, v0, a1, v1, a2, v2, out_) out_ = (a0) * (v0) + (a1) * (v1) + (a2) * (v2)
+#include "nvpro_pyramid.glsl"
+
+void main()
+{
+    nvproPyramidMain();
+}

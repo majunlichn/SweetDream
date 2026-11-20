@@ -238,6 +238,7 @@ struct VulkanComputePipelineCreateInfo
     vk::PipelineCreateFlags m_flags = {};
     VulkanShaderStageInfo m_stage;
     rad::Ref<VulkanPipelineLayout> m_layout;
+    uint32_t m_requiredSubgroupSize = 0;
 }; // struct VulkanComputePipelineCreateInfo
 
 class VulkanComputePipeline : public VulkanPipeline

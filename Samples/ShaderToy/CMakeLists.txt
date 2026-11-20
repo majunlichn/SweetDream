@@ -32,6 +32,15 @@ add_custom_target(ShaderToyAssets
         "${CMAKE_CURRENT_SOURCE_DIR}/Shaders"
         "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/ShaderToy/Shaders"
     COMMENT "Copying ShaderToy shaders and JSON configurations"
+    SOURCES
+        Shaders/MipmapTest/MipmapTest-1x1.json
+        Shaders/MipmapTest/MipmapTest-1x115.json
+        Shaders/MipmapTest/MipmapTest-133x73.json
+        Shaders/MipmapTest/MipmapTest-255x257.json
+        Shaders/MipmapTest/MipmapTest-256x128.json
+        Shaders/MipmapTest/MipmapTest-257x1.json
+        Shaders/MipmapTest/MipmapTest-BufferA.glsl
+        Shaders/MipmapTest/MipmapTest.glsl
 )
 add_dependencies(ShaderToy ShaderToyAssets)
 

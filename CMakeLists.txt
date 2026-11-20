@@ -56,6 +56,9 @@ set(SWEETDREAM_SOURCES
     Source/SweetDream/GPU/Vulkan/VulkanBuffer.cpp
     Source/SweetDream/GPU/Vulkan/VulkanImage.h
     Source/SweetDream/GPU/Vulkan/VulkanImage.cpp
+    Source/SweetDream/GPU/Vulkan/VulkanMipmap.h
+    Source/SweetDream/GPU/Vulkan/VulkanMipmap.cpp
+    Source/SweetDream/GPU/Vulkan/Shaders/Mipmap.comp
     Source/SweetDream/GPU/Vulkan/VulkanSampler.h
     Source/SweetDream/GPU/Vulkan/VulkanSampler.cpp
     Source/SweetDream/GPU/Vulkan/VulkanCommand.h
@@ -98,6 +101,36 @@ source_group(
 )
 
 find_package(Vulkan REQUIRED COMPONENTS glslc)
+set(SD_MIPMAP_SHADER "${SD_PROJECT_ROOT}/Source/SweetDream/GPU/Vulkan/Shaders/Mipmap.comp")
+set(SD_NVPRO_PYRAMID_DIR "${SD_PROJECT_ROOT}/ThirdParty/nvpro_pyramid")
+set_source_files_properties("${SD_MIPMAP_SHADER}" PROPERTIES HEADER_FILE_ONLY TRUE)
+foreach(FORMAT IN ITEMS RGBA8 RGBA32F)
+    if(FORMAT STREQUAL "RGBA8")
+        set(IS_RGBA8 1)
+    else()
+        set(IS_RGBA8 0)
+    endif()
+    foreach(MODE IN ITEMS General Fast)
+        if(MODE STREQUAL "Fast")
+            set(IS_FAST 1)
+        else()
+            set(IS_FAST 0)
+        endif()
+        set(OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/VulkanMipmap${MODE}${FORMAT}.inc")
+        add_custom_command(
+            OUTPUT "${OUTPUT}"
+            COMMAND Vulkan::glslc --target-env=vulkan1.1 -O -mfmt=c
+                "-DSD_MIPMAP_RGBA8=${IS_RGBA8}" "-DSD_MIPMAP_FAST=${IS_FAST}"
+                "-I${SD_NVPRO_PYRAMID_DIR}" "${SD_MIPMAP_SHADER}" -o "${OUTPUT}"
+            DEPENDS "${SD_MIPMAP_SHADER}" "${SD_NVPRO_PYRAMID_DIR}/nvpro_pyramid.glsl"
+            COMMENT "Compiling VulkanMipmap ${MODE} ${FORMAT} shader"
+            VERBATIM
+        )
+        target_sources(SweetDream PRIVATE "${OUTPUT}")
+    endforeach()
+endforeach()
+target_include_directories(SweetDream PRIVATE "${CMAKE_CURRENT_BINARY_DIR}")
+
 find_library(SHADERC_SHARED_LIBRARY
     NAMES shaderc_shared
     HINTS "${SD_VULKAN_SDK_ROOT}/Lib" "${SD_VULKAN_SDK_ROOT}/lib"
