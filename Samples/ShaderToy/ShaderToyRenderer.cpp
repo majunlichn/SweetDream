@@ -59,7 +59,7 @@ void AppendShaderSource(std::string& source, const rad::FilePath& path)
     {
         throw std::runtime_error("Cannot read file: " + rad::ToUtf8(path));
     }
-    source += "\n#line 1 \"" + ShaderPath(path) + "\"\n" + *text + "\n";
+    source += "\n#line 1 \"" + ShaderPath(path) + "\"\n" + text.assume_value() + "\n";
 }
 
 } // namespace
@@ -87,7 +87,7 @@ CompiledShaders CompileShaders(const EffectConfig& config)
     for (std::size_t i = 0; i < config.passes.size(); ++i)
     {
         const PassConfig& pass = config.passes[i];
-        std::string source = *fragmentSource;
+        std::string source = fragmentSource.assume_value();
         if (!config.common.empty())
         {
             source += "\n#include \"" + ShaderPath(config.common) + "\"\n";

@@ -152,7 +152,7 @@ std::string ReadText(const rad::FilePath& path)
     {
         throw std::runtime_error("Cannot read file: " + rad::ToUtf8(path));
     }
-    return std::move(*text);
+    return std::move(text.assume_value());
 }
 
 } // namespace

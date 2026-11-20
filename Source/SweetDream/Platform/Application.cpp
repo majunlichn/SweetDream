@@ -2,7 +2,7 @@
 
 #include <SweetDream/Core/IO/Logging.h>
 
-#include <rad/System/Application.h>
+#include <rad/Application.h>
 
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_vulkan.h>

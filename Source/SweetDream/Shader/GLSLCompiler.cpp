@@ -148,13 +148,13 @@ private:
 
     [[nodiscard]] static shaderc_include_result* TryLoadInclude(const rad::FilePath& path)
     {
-        std::optional<std::string> content = rad::File::ReadAllText(path);
+        auto content = rad::File::ReadAllText(path);
         if (!content)
         {
             return nullptr;
         }
 
-        return MakeResult(rad::ToUtf8(MakeResolvedPath(path)), std::move(*content));
+        return MakeResult(rad::ToUtf8(MakeResolvedPath(path)), std::move(content.assume_value()));
     }
 
     std::vector<rad::FilePath> m_searchPaths;
@@ -319,7 +319,7 @@ rad::Result<std::vector<uint32_t>, GLSLCompileError> GLSLCompiler::CompileFileTo
     vk::ShaderStageFlagBits stage, const rad::FilePath& filePath, const std::string& entryPoint,
     rad::Span<const GLSLMacro> macros, GLSLCompileOptLevel opt)
 {
-    std::optional<std::string> source = rad::File::ReadAllText(filePath);
+    const auto source = rad::File::ReadAllText(filePath);
     const std::string utf8FilePath = rad::ToUtf8(filePath);
     if (!source)
     {
@@ -327,7 +327,7 @@ rad::Result<std::vector<uint32_t>, GLSLCompileError> GLSLCompiler::CompileFileTo
             GLSLCompileError{"Cannot read GLSL source file: " + utf8FilePath});
     }
 
-    return CompileToSpv(stage, utf8FilePath, *source, entryPoint, macros, opt);
+    return CompileToSpv(stage, utf8FilePath, source.assume_value(), entryPoint, macros, opt);
 }
 
 } // namespace sd

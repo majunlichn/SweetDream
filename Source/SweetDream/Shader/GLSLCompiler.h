@@ -1,9 +1,9 @@
 #pragma once
 
+#include <rad/Core/FilePath.h>
 #include <rad/Core/RefCounted.h>
 #include <rad/Core/Result.h>
 #include <rad/Core/Span.h>
-#include <rad/System/FileSystem.h>
 
 #include <shaderc/env.h>
 #include <vulkan/vulkan.hpp>

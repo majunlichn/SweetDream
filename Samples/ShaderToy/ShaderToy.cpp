@@ -5,7 +5,7 @@
 #include <SweetDream/Gui/VulkanWindow.h>
 #include <SweetDream/Platform/Application.h>
 
-#include <rad/System/Application.h>
+#include <rad/Application.h>
 
 #define SDL_MAIN_HANDLED
 #include <SDL3/SDL.h>

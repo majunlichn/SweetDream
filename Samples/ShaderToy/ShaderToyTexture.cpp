@@ -32,7 +32,8 @@ Texture LoadTexture(sd::VulkanDevice* device, const rad::FilePath& path,
         throw std::runtime_error("Cannot read texture: " + rad::ToUtf8(path) +
                                  "; run download_resources.py from the ShaderToy asset directory");
     }
-    auto pixels = rad::ImageUnorm8::LoadFromMemory(data->data(), data->size(), 4);
+    const auto& fileBytes = data.assume_value();
+    auto pixels = rad::ImageUnorm8::LoadFromMemory(fileBytes.data(), fileBytes.size(), 4);
     if (!pixels)
     {
         throw std::runtime_error("Cannot decode texture: " + rad::ToUtf8(path));

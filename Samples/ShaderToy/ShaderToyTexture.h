@@ -2,7 +2,7 @@
 
 #include <SweetDream/GPU/Vulkan/VulkanImage.h>
 
-#include <rad/System/FileSystem.h>
+#include <rad/Core/FilePath.h>
 
 namespace shadertoy
 {

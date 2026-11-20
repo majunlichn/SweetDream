@@ -1,6 +1,6 @@
 #pragma once
 
-#include <rad/System/FileSystem.h>
+#include <rad/Core/FilePath.h>
 
 #include <array>
 #include <cstdint>
