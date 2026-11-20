@@ -1,7 +1,8 @@
 #include "ShaderToyRenderer.h"
 
-#include <SweetDream/GPU/Vulkan/VulkanQueue.h>
 #include <SweetDream/Core/IO/Logging.h>
+#include <SweetDream/GPU/Vulkan/VulkanImageReadback.h>
+#include <SweetDream/GPU/Vulkan/VulkanQueue.h>
 #include <SweetDream/Gui/VulkanWindow.h>
 #include <SweetDream/Platform/Application.h>
 
@@ -15,14 +16,39 @@
 #include <chrono>
 #include <cstdlib>
 #include <ctime>
+#include <filesystem>
+#include <format>
 #include <iostream>
 #include <memory>
+#include <new>
 #include <stdexcept>
 #include <string_view>
+#include <system_error>
 #include <utility>
 
 namespace
 {
+
+constexpr sd::VulkanImageState ColorAttachment{vk::ImageLayout::eColorAttachmentOptimal,
+                                                vk::PipelineStageFlagBits2::eColorAttachmentOutput,
+                                                vk::AccessFlagBits2::eColorAttachmentWrite};
+constexpr sd::VulkanImageState Present{vk::ImageLayout::ePresentSrcKHR};
+
+std::filesystem::path MakeScreenshotPath(const rad::FilePath& configPath, uint32_t frameIndex)
+{
+    std::string effectName = rad::ToUtf8(configPath.stem());
+    // The PNG writer takes a narrow filename; use a portable ASCII basename.
+    std::replace_if(effectName.begin(), effectName.end(),
+                    [](char c)
+                    {
+                        return !((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') ||
+                                 (c >= '0' && c <= '9') || c == ' ' || c == '-' || c == '_');
+                    },
+                    '_');
+    const std::filesystem::path directory{"Screenshots"};
+    std::filesystem::create_directories(directory);
+    return directory / std::format("{}_Frame{:06}.png", effectName, frameIndex);
+}
 
 void CheckGpuRequirements(vk::PhysicalDevice physicalDevice,
                           const vk::detail::DispatchLoaderDynamic& dispatcher)
@@ -107,7 +133,7 @@ protected:
         {
             throw std::runtime_error("Failed to bind the Vulkan device");
         }
-        const vk::Result swapchainResult = m_window->CreateSwapchain();
+        const vk::Result swapchainResult = m_window->CreateSwapchain({.allowReadback = true});
         if (swapchainResult != vk::Result::eSuccess)
         {
             throw std::runtime_error("Failed to create Vulkan swapchain: " +
@@ -118,6 +144,7 @@ protected:
             sd::VulkanQueueFamily::Graphics, vk::CommandPoolCreateFlagBits::eResetCommandBuffer);
         m_commands = m_pool->AllocateCommandBuffers(
             vk::CommandBufferLevel::ePrimary, m_window->GetMaxFrameLag());
+        m_readback = std::make_unique<sd::VulkanImageReadback>(device.get());
         m_renderer = std::make_unique<shadertoy::Renderer>(
             device.get(), std::move(m_config), std::move(m_shaders), m_window->GetMaxFrameLag());
         ResizeRenderer();
@@ -127,10 +154,17 @@ protected:
 
     bool OnEvent(const SDL_Event& event) override
     {
-        if (event.type == SDL_EVENT_KEY_DOWN && event.key.windowID == m_window->GetID() &&
-            event.key.key == SDLK_ESCAPE)
+        if (event.type == SDL_EVENT_KEY_DOWN && event.key.windowID == m_window->GetID())
         {
-            RequestExit();
+            if (event.key.key == SDLK_ESCAPE)
+            {
+                RequestExit();
+            }
+            if (event.key.key == SDLK_F12 && !event.key.repeat)
+            {
+                m_screenshotRequested = true;
+                return true;
+            }
         }
         if (event.type == SDL_EVENT_WINDOW_FOCUS_LOST && event.window.windowID == m_window->GetID())
         {
@@ -206,24 +240,36 @@ protected:
         command->Begin();
         command->ImageMemoryBarrier(
             image->GetHandle(), range, vk::ImageLayout::eUndefined,
-            vk::ImageLayout::eColorAttachmentOptimal,
+            ColorAttachment.layout,
             vk::PipelineStageFlagBits2::eColorAttachmentOutput,
-            vk::AccessFlagBits2::eNone, vk::PipelineStageFlagBits2::eColorAttachmentOutput,
-            vk::AccessFlagBits2::eColorAttachmentWrite);
+            vk::AccessFlagBits2::eNone, ColorAttachment.stage, ColorAttachment.access);
         m_renderer->Render(command, m_window->GetSwapchainImageView(), slot, frame);
-        command->ImageMemoryBarrier(
-            image->GetHandle(), range, vk::ImageLayout::eColorAttachmentOptimal,
-            vk::ImageLayout::ePresentSrcKHR, vk::PipelineStageFlagBits2::eColorAttachmentOutput,
-            vk::AccessFlagBits2::eColorAttachmentWrite, vk::PipelineStageFlagBits2::eNone,
-            vk::AccessFlagBits2::eNone);
+        const bool screenshot = std::exchange(m_screenshotRequested, false) &&
+                                RecordScreenshot(command, image);
+        if (!screenshot)
+        {
+            command->ImageMemoryBarrier(
+                image->GetHandle(), range, ColorAttachment.layout, Present.layout,
+                ColorAttachment.stage, ColorAttachment.access, Present.stage, Present.access);
+        }
         command->End();
+        auto* fence = m_window->GetFrameFence();
         m_window->GetDevice()->GetQueue(sd::VulkanQueueFamily::Graphics)->Submit(
             command, m_window->GetSwapchainImageAcquiredSemaphore(),
             vk::PipelineStageFlagBits::eColorAttachmentOutput,
-            m_window->GetRenderCompleteSemaphore(), m_window->GetFrameFence());
+            m_window->GetRenderCompleteSemaphore(), fence);
         if (!m_window->Present())
         {
             throw std::runtime_error("Failed to present ShaderToy frame");
+        }
+        if (screenshot)
+        {
+            const auto result = fence->Wait();
+            if (result != vk::Result::eSuccess)
+            {
+                throw std::runtime_error("Failed to wait for screenshot: " + vk::to_string(result));
+            }
+            SaveScreenshot(frame.index);
         }
         m_click = false;
         ++m_totalFrames;
@@ -242,6 +288,7 @@ protected:
             m_window->WaitIdle();
             m_commands.clear();
             m_pool.reset();
+            m_readback.reset();
             m_renderer.reset();
             m_window->Destroy();
             m_window.reset();
@@ -249,6 +296,57 @@ protected:
     }
 
 private:
+    bool RecordScreenshot(sd::VulkanCommandBuffer* command, sd::VulkanImage* image)
+    {
+        const auto* swapchain = m_window->GetSwapchain();
+        if (!(swapchain->GetImageUsage() & vk::ImageUsageFlagBits::eTransferSrc))
+        {
+            SD_LOG(warn, "Screenshot unavailable: the swapchain does not support transfer-source usage");
+            return false;
+        }
+        const auto format = swapchain->GetImageFormat();
+        if ((swapchain->GetImageColorSpace() != vk::ColorSpaceKHR::eSrgbNonlinear) ||
+            (format != vk::Format::eR8G8B8A8Unorm && format != vk::Format::eR8G8B8A8Srgb &&
+             format != vk::Format::eB8G8R8A8Unorm && format != vk::Format::eB8G8R8A8Srgb))
+        {
+            SD_LOG(warn, "Screenshot unavailable for swapchain format {} in color space {}",
+                   vk::to_string(format), vk::to_string(swapchain->GetImageColorSpace()));
+            return false;
+        }
+        try
+        {
+            (void)m_readback->Execute(command, image, ColorAttachment, Present);
+            return true;
+        }
+        catch (const vk::SystemError& error)
+        {
+            SD_LOG(err, "Failed to record screenshot: {}", error.what());
+            return false;
+        }
+    }
+
+    void SaveScreenshot(uint32_t frameIndex) const
+    {
+        try
+        {
+            const auto path = MakeScreenshotPath(m_options.config, frameIndex).string();
+            if (!m_readback->SavePNG(path))
+            {
+                SD_LOG(err, "Failed to save screenshot: {}", path);
+                return;
+            }
+            SD_LOG(info, "Saved screenshot: {}", path);
+        }
+        catch (const std::system_error& error)
+        {
+            SD_LOG(err, "Screenshot failed: {}", error.what());
+        }
+        catch (const std::bad_alloc& error)
+        {
+            SD_LOG(err, "Screenshot failed: {}", error.what());
+        }
+    }
+
     shadertoy::FrameData BuildFrameData()
     {
         shadertoy::FrameData frame;
@@ -322,6 +420,7 @@ private:
     std::unique_ptr<shadertoy::Renderer> m_renderer;
     rad::Ref<sd::VulkanCommandPool> m_pool;
     std::vector<rad::Ref<sd::VulkanCommandBuffer>> m_commands;
+    std::unique_ptr<sd::VulkanImageReadback> m_readback;
     std::chrono::steady_clock::time_point m_start;
     std::chrono::steady_clock::time_point m_frameRateStart;
     uint32_t m_frame = 0;
@@ -333,6 +432,7 @@ private:
     std::array<float, 2> m_origin = {};
     bool m_down = false;
     bool m_click = false;
+    bool m_screenshotRequested = false;
 };
 
 } // namespace
@@ -349,7 +449,8 @@ int main(int argc, char** argv)
             std::cout << "ShaderToy [--width N] [--height N] [--config passes.json] [--gpu-index N]\n"
                          "          [--validate] [--frames N] [--help]\n"
                          "--validate: validate JSON and compile shaders without creating a window\n"
-                         "--frames: exit after N rendered frames (default: run until closed)\n";
+                         "--frames: exit after N rendered frames (default: run until closed)\n"
+                         "F12: save a PNG of the next rendered frame in Screenshots/\n";
             return EXIT_SUCCESS;
         }
         shadertoy::EffectConfig config = shadertoy::LoadEffectConfig(options.config);

@@ -31,6 +31,15 @@ python ShaderToy/download_resources.py
 ```
 
 Defaults: Light Cycle, 1280x720. `--frames N` limits rendering; Escape exits.
+Press **F12** to save the next rendered frame as a native-resolution PNG in
+`Screenshots/` under the working directory. For example,
+`LightCycle_Frame000123.png` uses the effect's JSON filename without `.json`
+and the captured frame's zero-based `iFrame`, which resets on resize. The effect
+name keeps ASCII letters, numbers, spaces, hyphens, and underscores; other
+characters are replaced by underscores. Saving a screenshot overwrites any
+existing file with the same name.
+Screenshots require an 8-bit RGBA/BGRA sRGB-color-space swapchain that supports
+transfer-source usage; otherwise ShaderToy logs a warning and continues rendering.
 `--gpu-index N` selects GPU N (default 0), with no automatic fallback.
 Requires Vulkan 1.3, dynamic rendering, and synchronization2; unsupported features abort.
 `--validate` checks JSON and shader compilation, not texture loading or GPU capabilities.

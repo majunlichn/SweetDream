@@ -495,11 +495,18 @@ vk::Result VulkanWindow::CreateSwapchain()
     createInfo.imageExtent = extent;
     createInfo.imageArrayLayers = 1;
     createInfo.imageUsage = vk::ImageUsageFlagBits::eColorAttachment;
+    const bool readback = config.allowReadback &&
+        HasAllBits(capabilities.supportedUsageFlags, vk::ImageUsageFlagBits::eTransferSrc);
+    if (readback)
+    {
+        createInfo.imageUsage |= vk::ImageUsageFlagBits::eTransferSrc;
+    }
     createInfo.imageSharingMode = vk::SharingMode::eExclusive;
     createInfo.preTransform = preTransform;
     createInfo.compositeAlpha = compositeAlpha;
     createInfo.presentMode = presentMode;
-    createInfo.clipped = VK_TRUE;
+    // Readback needs defined pixels even when another window obscures the swapchain.
+    createInfo.clipped = readback ? VK_FALSE : VK_TRUE;
     createInfo.oldSwapchain = m_swapchain ? m_swapchain->GetHandle() : vk::SwapchainKHR{};
 
     // Vulkan retires a non-null oldSwapchain as soon as vkCreateSwapchainKHR is

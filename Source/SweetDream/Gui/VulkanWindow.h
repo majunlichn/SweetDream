@@ -24,6 +24,8 @@ struct SwapchainConfig
     // Preferred VkSwapchainCreateInfoKHR::minImageCount; clamped to surface capabilities.
     uint32_t minImageCount = 3;
     bool vsync = true;
+    // Request transfer-source usage when supported; check the resulting swapchain's usage.
+    bool allowReadback = false;
 };
 
 enum class FrameStatus

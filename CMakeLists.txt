@@ -56,6 +56,8 @@ set(SWEETDREAM_SOURCES
     Source/SweetDream/GPU/Vulkan/VulkanBuffer.cpp
     Source/SweetDream/GPU/Vulkan/VulkanImage.h
     Source/SweetDream/GPU/Vulkan/VulkanImage.cpp
+    Source/SweetDream/GPU/Vulkan/VulkanImageReadback.h
+    Source/SweetDream/GPU/Vulkan/VulkanImageReadback.cpp
     Source/SweetDream/GPU/Vulkan/VulkanMipmap.h
     Source/SweetDream/GPU/Vulkan/VulkanMipmap.cpp
     Source/SweetDream/GPU/Vulkan/Shaders/Mipmap.comp

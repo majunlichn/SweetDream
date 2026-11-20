@@ -31,6 +31,13 @@
 namespace sd
 {
 
+struct VulkanImageState
+{
+    vk::ImageLayout layout = vk::ImageLayout::eUndefined;
+    vk::PipelineStageFlags2 stage = {};
+    vk::AccessFlags2 access = {};
+};
+
 class VulkanVersion
 {
 public:

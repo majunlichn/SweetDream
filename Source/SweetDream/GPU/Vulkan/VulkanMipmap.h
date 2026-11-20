@@ -17,12 +17,7 @@ class VulkanPipelineLayout;
 class VulkanMipmap
 {
 public:
-    struct ImageState
-    {
-        vk::ImageLayout layout = vk::ImageLayout::eUndefined;
-        vk::PipelineStageFlags2 stage = {};
-        vk::AccessFlags2 access = {};
-    };
+    using ImageState = VulkanImageState;
 
     explicit VulkanMipmap(VulkanDevice* device);
     ~VulkanMipmap();

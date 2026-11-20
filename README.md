@@ -19,7 +19,10 @@ A C++20 application development framework, exposed as the CMake target
 
 - **Core**: shared strings and logging utilities, independent of GPU and GUI code.
 - **GPU/Vulkan**: devices, memory allocation, resources, commands, pipelines, synchronization,
-  and mipmap generation.
+  mipmap generation, and image readback with PNG and Radiance HDR export.
+  `VulkanImageReadback::ExecuteHDR()` accepts linear RGBA32F, RGBA16F, or
+  R11G11B10 UFLOAT and returns RGBA32F data. The latter two formats require
+  device blit support. It does not decode PQ or tone map.
 - **Shader**: runtime GLSL compilation; SPIR-V validation, assembly, and disassembly.
 - **Platform**: SDL3 application lifecycle, event dispatch, and frame processing.
 - **Gui**: windows, Vulkan presentation, and Dear ImGui/ImPlot integration.
