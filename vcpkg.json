@@ -1,5 +1,6 @@
 {
   "dependencies": [
+    "assimp",
     "backward-cpp",
     "boost-algorithm",
     "boost-container",

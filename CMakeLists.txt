@@ -83,6 +83,8 @@ set(SWEETDREAM_SOURCES
     Source/SweetDream/GPU/Vulkan/VulkanPipeline.cpp
     Source/SweetDream/GPU/Vulkan/VulkanDescriptor.h
     Source/SweetDream/GPU/Vulkan/VulkanDescriptor.cpp
+    Source/SweetDream/Scene/Import/SceneImporter.h
+    Source/SweetDream/Scene/Import/SceneImporter.cpp
     Source/SweetDream/Shader/GLSLCompiler.h
     Source/SweetDream/Shader/GLSLCompiler.cpp
     Source/SweetDream/Shader/SpvContext.h
@@ -186,6 +188,7 @@ else()
     )
 endif()
 find_package(VulkanMemoryAllocator CONFIG REQUIRED)
+find_package(assimp CONFIG REQUIRED)
 
 target_include_directories(SweetDream
     PUBLIC
@@ -198,6 +201,7 @@ target_link_libraries(SweetDream
     PUBLIC rad::rad
     PUBLIC shaderc::shaderc
     PUBLIC spirv-tools::spirv-tools
+    PRIVATE assimp::assimp
 )
 
 if(SD_BUILD_GUI)
