@@ -17,6 +17,7 @@ file(TO_CMAKE_PATH "$ENV{VULKAN_SDK}" SD_VULKAN_SDK_ROOT)
 
 option(SD_BUILD_SAMPLES "Build SweetDream samples" ON)
 option(SD_BUILD_GUI "Build SweetDream GUI support using SDL3" ON)
+option(SD_BUILD_TESTS "Build SweetDream unit tests" OFF)
 include(cmake/sdFindSDL3.cmake)
 
 set(CMAKE_CXX_STANDARD 20)
@@ -83,6 +84,14 @@ set(SWEETDREAM_SOURCES
     Source/SweetDream/GPU/Vulkan/VulkanPipeline.cpp
     Source/SweetDream/GPU/Vulkan/VulkanDescriptor.h
     Source/SweetDream/GPU/Vulkan/VulkanDescriptor.cpp
+    Source/SweetDream/Scene/Camera.h
+    Source/SweetDream/Scene/Camera.cpp
+    Source/SweetDream/Scene/Light.h
+    Source/SweetDream/Scene/Material.h
+    Source/SweetDream/Scene/Mesh.h
+    Source/SweetDream/Scene/Mesh.cpp
+    Source/SweetDream/Scene/Scene.h
+    Source/SweetDream/Scene/Scene.cpp
     Source/SweetDream/Scene/Import/SceneImporter.h
     Source/SweetDream/Scene/Import/SceneImporter.cpp
     Source/SweetDream/Shader/GLSLCompiler.h
@@ -358,6 +367,18 @@ if(SD_BUILD_SAMPLES AND SD_BUILD_GUI)
             COMMENT "Copying HelloTriangle shared runtimes"
         )
     endif()
+endif()
+
+if(SD_BUILD_TESTS)
+    enable_testing()
+    find_package(GTest CONFIG REQUIRED)
+    add_executable(SweetDreamUnitTests
+        Tests/SceneTests.cpp
+    )
+    target_link_libraries(SweetDreamUnitTests PRIVATE SweetDream::SweetDream GTest::gtest_main)
+    set_target_properties(SweetDreamUnitTests PROPERTIES FOLDER Tests)
+    add_test(NAME SweetDream.UnitTests COMMAND SweetDreamUnitTests
+        WORKING_DIRECTORY "$<TARGET_FILE_DIR:SweetDreamUnitTests>")
 endif()
 
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)

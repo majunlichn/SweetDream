@@ -8,12 +8,14 @@ See [README.md](README.md) for project goals, features, and build requirements.
 - `Source/SweetDream/`: framework code, grouped by module.
   - `Core/`: shared utilities; keep independent of GPU, platform, and GUI code.
   - `GPU/Vulkan/`: Vulkan resource and execution wrappers.
+  - `Scene/`: CPU scene data and hierarchy; keep public types independent of import and GPU APIs.
   - `Shader/`: GLSL compilation and SPIR-V tools.
   - `Platform/`: application lifecycle and event dispatch.
   - `Gui/`: windows and UI integration, connecting platform and GPU code.
   - Keep public `Foo.h` and optional `Foo.cpp` together.
   - The public include root is `Source`, e.g. `<SweetDream/GPU/Vulkan/VulkanDevice.h>`.
 - `Samples/`: applications demonstrating framework features; keep sample-specific logic here.
+- `Tests/`: focused framework tests, enabled by `SD_BUILD_TESTS`.
 - `cmake/`: build support, including SDL3 discovery.
 - `ThirdParty/`: submodules and dependency build helpers. Declare other dependencies in
   [vcpkg.json](vcpkg.json); avoid unrelated changes to vendored code.
@@ -36,8 +38,8 @@ See [README.md](README.md) for project goals, features, and build requirements.
 ## Build and validation
 
 - Follow the [README build instructions](README.md#build).
-- Build affected targets and run focused validation for behavior changes. SweetDream currently
-  has no dedicated CTest suite; bundled radcpp tests are disabled by the top-level build.
+- Build affected targets and run focused validation for behavior changes. Use CTest with
+  `SD_BUILD_TESTS=ON` for SweetDream tests; bundled radcpp tests remain disabled.
 - Use ShaderToy's `--validate` for JSON and shader compilation checks. It does not validate
   texture loading or GPU capabilities; use `--frames N` for bounded rendering smoke tests.
 - **When running samples, test executables, or validation commands, use the
